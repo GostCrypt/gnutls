@@ -599,6 +599,7 @@ AC_CONFIG_FILES([
   lib/includes/gnutls/gnutls.h
   lib/minitasn1/Makefile
   lib/nettle/Makefile
+  lib/gcrypt/Makefile
   lib/opencdk/Makefile
   lib/openpgp/Makefile
   lib/x509/Makefile
