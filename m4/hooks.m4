@@ -65,6 +65,24 @@ AC_DEFUN([LIBGNUTLS_HOOKS],
   DLL_VERSION=`expr ${LT_CURRENT} - ${LT_AGE}`
   AC_SUBST(DLL_VERSION)
 
+  AC_ARG_WITH(libgcrypt,
+    AS_HELP_STRING([--with-libgcrypt], [use libgcrypt as crypto library]),
+      libgcrypt=$withval,
+      libgcrypt=no)
+    if test "$libgcrypt" = "yes"; then
+      cryptolib=libgcrypt
+      AC_DEFINE([HAVE_GCRYPT], 1, [whether the gcrypt library is in use])
+      AC_LIB_HAVE_LINKFLAGS([gcrypt], [gpg-error], [#include <gcrypt.h>],
+                      [enum gcry_cipher_algos i = GCRY_CIPHER_CAMELLIA128])
+      if test "$ac_cv_libgcrypt" != yes; then
+        AC_MSG_ERROR([[
+***
+*** Libgcrypt v1.4.0 or later was not found. You may want to get it from
+*** ftp://ftp.gnupg.org/gcrypt/libgcrypt/
+***
+    ]])
+      fi
+    else
   PKG_CHECK_MODULES(NETTLE, [nettle >= 2.7], [cryptolib="nettle"], [
 AC_MSG_ERROR([[
   *** 
@@ -77,10 +95,11 @@ AC_MSG_ERROR([[
   *** Libhogweed (nettle's companion library) was not found. Note that you must compile nettle with gmp support.
 ]])
   ])
-  AM_CONDITIONAL(ENABLE_NETTLE, test "$cryptolib" = "nettle")
   AC_DEFINE([HAVE_LIBNETTLE], 1, [nettle is enabled])
 
   GNUTLS_REQUIRES_PRIVATE="Requires.private: nettle, hogweed"
+  fi
+  AM_CONDITIONAL(ENABLE_NETTLE, test "$cryptolib" = "nettle")
 
   AC_ARG_VAR(GMP_CFLAGS, [C compiler flags for gmp])
   AC_ARG_VAR(GMP_LIBS, [linker flags for gmp])
