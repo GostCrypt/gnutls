@@ -9,6 +9,9 @@ subsystems.
 
 ** libgnutls: DTLS replay protection can now be disabled.
 
+** libgnutls: Fixes in SRTP extension generation when MKI is being
+used.
+
 ** libgnutls: Added ability to set hooks prior to sending or receiving
 any handshake message with gnutls_handshake_set_hook_function().
 
@@ -17,9 +20,12 @@ GNUTLS_NO_REPLAY_PROTECTION: Added
 gnutls_certificate_set_trust_list: Added
 gnutls_cipher_get_tag_size: Added
 gnutls_record_overhead_size: Added
-gnutls_record_overhead_size2: Added
+gnutls_est_record_overhead_size: Added
 gnutls_handshake_set_hook_function: Added
 gnutls_handshake_description_get_name: Added
+gnutls_digest_list: Added
+gnutls_digest_get_id: Added
+gnutls_digest_get_name: Added
 
 
 * Version 3.2.1 (released 2013-06-01)

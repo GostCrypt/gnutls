@@ -578,7 +578,7 @@ void gnutls_dtls_set_timeouts (gnutls_session_t session, unsigned int retrans_ti
  **/
 void gnutls_dtls_set_mtu (gnutls_session_t session, unsigned int mtu)
 {
-  session->internals.dtls.mtu  = mtu;
+  session->internals.dtls.mtu  = MIN(mtu, DEFAULT_MAX_RECORD_SIZE);
 }
 
 static int record_overhead(const cipher_entry_st* cipher, const mac_entry_st* mac, 
@@ -625,7 +625,7 @@ int t, ret;
 }  
 
 /**
- * gnutls_record_overhead_size2:
+ * gnutls_est_record_overhead_size:
  * @version: is a #gnutls_protocol_t value
  * @cipher: is a #gnutls_cipher_algorithm_t value
  * @mac: is a #gnutls_mac_algorithm_t value
@@ -635,14 +635,14 @@ int t, ret;
  * This function will return the set size in bytes of the overhead
  * due to TLS (or DTLS) per record.
  *
- * Note that this function may not provide inacurate values because
- * of the many options that may be negotiated in TLS/DTLS. An more accurate
- * value can be obtained using gnutls_record_overhead_size() after
- * a completed handshake.
+ * Note that this function may provide inacurate values when TLS
+ * extensions that modify the record format are negotiated. In these
+ * cases a more accurate value can be obtained using gnutls_record_overhead_size() 
+ * after a completed handshake.
  *
  * Since: 3.2.2
  **/
-size_t gnutls_record_overhead_size2 (gnutls_protocol_t version, gnutls_cipher_algorithm_t cipher,
+size_t gnutls_est_record_overhead_size (gnutls_protocol_t version, gnutls_cipher_algorithm_t cipher,
 			             gnutls_mac_algorithm_t mac, gnutls_compression_method_t comp, 
 			             unsigned int flags)
 {

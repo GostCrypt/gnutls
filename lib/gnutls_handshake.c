@@ -1143,14 +1143,14 @@ _gnutls_send_empty_handshake (gnutls_session_t session,
 
 inline
 static int call_hook_func(gnutls_session_t session, gnutls_handshake_description_t type,
-                          unsigned post, unsigned incoming)
+                          unsigned incoming)
 {
   if (session->internals.h_hook == NULL)
     return 0;
   else 
     {
       if (session->internals.h_type == type || session->internals.h_type == GNUTLS_HANDSHAKE_ANY)
-        return session->internals.h_hook(session, type, post, incoming);
+        return session->internals.h_hook(session, type, incoming);
 
       return 0;
     }
@@ -1222,15 +1222,14 @@ _gnutls_send_handshake (gnutls_session_t session, mbuffer_st * bufel,
         return ret;
       }
 
-  ret = call_hook_func(session, type, 0, 0);
+  session->internals.last_handshake_out = type;
+
+  ret = call_hook_func(session, type, 0);
   if (ret < 0)
     {
       gnutls_assert ();
-      _mbuffer_xfree(&bufel);
       return ret;
     }
-
-  session->internals.last_handshake_out = type;
 
   ret = _gnutls_handshake_io_cache_int (session, type, bufel);
   if (ret < 0)
@@ -1262,13 +1261,6 @@ _gnutls_send_handshake (gnutls_session_t session, mbuffer_st * bufel,
       /* send cached messages */
       ret = _gnutls_handshake_io_write_flush (session);
       break;
-    }
-
-  ret = call_hook_func(session, type, 1, 0);
-  if (ret < 0)
-    {
-      gnutls_assert ();
-      return ret;
     }
 
   return ret;
@@ -1397,13 +1389,6 @@ _gnutls_recv_handshake (gnutls_session_t session,
 
   session->internals.last_handshake_in = hsk.htype;
 
-  ret = call_hook_func(session, hsk.htype, 0, 1);
-  if (ret < 0)
-    {
-      gnutls_assert ();
-      goto cleanup;
-    }
-
   ret = _gnutls_handshake_hash_add_recvd (session, hsk.htype,
                                               hsk.header, hsk.header_size,
                                               hsk.data.data, hsk.data.length);
@@ -1438,9 +1423,12 @@ _gnutls_recv_handshake (gnutls_session_t session,
           goto cleanup;
         }
       else
-        /* Signal our caller we have received a verification cookie
-           and ClientHello needs to be sent again. */
-        ret = 1;
+        {
+          /* Signal our caller we have received a verification cookie
+             and ClientHello needs to be sent again. */
+          ret = 1;
+          goto cleanup;
+        }
 	
       break;
     case GNUTLS_HANDSHAKE_SERVER_HELLO_DONE:
@@ -1473,7 +1461,7 @@ _gnutls_recv_handshake (gnutls_session_t session,
       goto cleanup;
     }
 
-  ret = call_hook_func(session, hsk.htype, 1, 1);
+  ret = call_hook_func(session, hsk.htype, 1);
   if (ret < 0)
     {
       gnutls_assert ();
@@ -2110,7 +2098,9 @@ _gnutls_send_server_hello (gnutls_session_t session, int again)
     {
       datalen = 2 + session_id_len + 1 + GNUTLS_RANDOM_SIZE + 3;
       ret =
-        _gnutls_gen_extensions (session, &extdata, GNUTLS_EXT_ANY);
+        _gnutls_gen_extensions (session, &extdata, 
+                                (session->internals.resumed==RESUME_TRUE)?
+                                GNUTLS_EXT_MANDATORY:GNUTLS_EXT_ANY);
       if (ret < 0)
         {
           gnutls_assert ();
