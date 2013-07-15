@@ -134,6 +134,12 @@ wrap_gcry_mpi_release (bigint_t a)
   gcry_mpi_release (a);
 }
 
+static void
+wrap_gcry_mpi_clear (bigint_t a)
+{
+  gcry_mpi_mul_ui (a, a, 0);
+}
+
 #undef _gnutls_mpi_alloc_like
 #define _gnutls_mpi_alloc_like(x) gcry_mpi_new(gcry_mpi_get_nbits(x))
 
@@ -409,6 +415,7 @@ gnutls_crypto_bigint_st _gnutls_mpi_ops = {
   .bigint_div = wrap_gcry_mpi_div,
   .bigint_prime_check = wrap_gcry_prime_check,
   .bigint_release = wrap_gcry_mpi_release,
+  .bigint_clear = wrap_gcry_mpi_clear,
   .bigint_print = wrap_gcry_mpi_print,
   .bigint_scan = wrap_gcry_mpi_scan,
   .bigint_generate_group = wrap_gcry_generate_group
