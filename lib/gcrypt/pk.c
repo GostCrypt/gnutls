@@ -24,7 +24,6 @@
  * encryption and signatures. 
  */
 
-#error NO ECC SUPPORT
 
 #include <gnutls_int.h>
 #include <gnutls_mpi.h>
@@ -513,7 +512,7 @@ cleanup:
 }
 
 static int
-_dsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
+_dsa_generate_params (gnutls_pk_params_st * params, int bits)
 {
 
   int ret;
@@ -558,7 +557,7 @@ _dsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[0] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[0] = gcry_sexp_nth_mpi (list, 1, 0);
   gcry_sexp_release (list);
 
   list = gcry_sexp_find_token (key, "q", 0);
@@ -569,7 +568,7 @@ _dsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[1] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[1] = gcry_sexp_nth_mpi (list, 1, 0);
   gcry_sexp_release (list);
 
   list = gcry_sexp_find_token (key, "g", 0);
@@ -580,7 +579,7 @@ _dsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[2] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[2] = gcry_sexp_nth_mpi (list, 1, 0);
   gcry_sexp_release (list);
 
   list = gcry_sexp_find_token (key, "y", 0);
@@ -591,7 +590,7 @@ _dsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[3] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[3] = gcry_sexp_nth_mpi (list, 1, 0);
   gcry_sexp_release (list);
 
 
@@ -603,32 +602,66 @@ _dsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[4] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[4] = gcry_sexp_nth_mpi (list, 1, 0);
 
   gcry_sexp_release (list);
   gcry_sexp_release (key);
 
-  _gnutls_mpi_log ("p: ", resarr[0]);
-  _gnutls_mpi_log ("q: ", resarr[1]);
-  _gnutls_mpi_log ("g: ", resarr[2]);
-  _gnutls_mpi_log ("y: ", resarr[3]);
-  _gnutls_mpi_log ("x: ", resarr[4]);
+  _gnutls_mpi_log ("p: ", params->params[0]);
+  _gnutls_mpi_log ("q: ", params->params[1]);
+  _gnutls_mpi_log ("g: ", params->params[2]);
+  _gnutls_mpi_log ("y: ", params->params[3]);
+  _gnutls_mpi_log ("x: ", params->params[4]);
 
-  *resarr_len = 5;
+  params->params_nr = 5;
 
   return 0;
 
 }
 
+static int calc_rsa_exp (gnutls_pk_params_st* params)
+{
+  bigint_t tmp = _gnutls_mpi_alloc_like (params->params[0]);
+
+  if (params->params_nr < RSA_PRIVATE_PARAMS - 2)
+    {
+      gnutls_assert ();
+      return GNUTLS_E_INTERNAL_ERROR;
+    }
+
+  if (tmp == NULL)
+    {
+      gnutls_assert ();
+      return GNUTLS_E_MEMORY_ERROR;
+    }
+
+  /* [6] = d % p-1, [7] = d % q-1 */
+  _gnutls_mpi_sub_ui (tmp, params->params[3], 1);
+  params->params[6] = _gnutls_mpi_mod (params->params[2] /*d */ , tmp);
+
+  _gnutls_mpi_sub_ui (tmp, params->params[4], 1);
+  params->params[7] = _gnutls_mpi_mod (params->params[2] /*d */ , tmp);
+
+  _gnutls_mpi_release (&tmp);
+
+  if (params->params[7] == NULL || params->params[6] == NULL)
+    {
+      gnutls_assert ();
+      return GNUTLS_E_MEMORY_ERROR;
+    }
+
+  return 0;
+}
+
 static int
-_rsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
+_rsa_generate_params (gnutls_pk_params_st * params, int bits)
 {
 
-  int ret, i;
+  int ret;
+  unsigned int i;
   gcry_sexp_t parms, key, list;
-  bigint_t tmp;
 
-  if (*resarr_len < RSA_PRIVATE_PARAMS)
+  if (params->params_nr < RSA_PRIVATE_PARAMS)
     {
       gnutls_assert ();
       return GNUTLS_E_INTERNAL_ERROR;
@@ -659,7 +692,7 @@ _rsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[0] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[0] = gcry_sexp_nth_mpi (list, 1, 0);
   gcry_sexp_release (list);
 
   list = gcry_sexp_find_token (key, "e", 0);
@@ -670,7 +703,7 @@ _rsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[1] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[1] = gcry_sexp_nth_mpi (list, 1, 0);
   gcry_sexp_release (list);
 
   list = gcry_sexp_find_token (key, "d", 0);
@@ -681,7 +714,7 @@ _rsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[2] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[2] = gcry_sexp_nth_mpi (list, 1, 0);
   gcry_sexp_release (list);
 
   list = gcry_sexp_find_token (key, "p", 0);
@@ -692,7 +725,7 @@ _rsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[3] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[3] = gcry_sexp_nth_mpi (list, 1, 0);
   gcry_sexp_release (list);
 
 
@@ -704,7 +737,7 @@ _rsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[4] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[4] = gcry_sexp_nth_mpi (list, 1, 0);
   gcry_sexp_release (list);
 
 
@@ -716,31 +749,23 @@ _rsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       return GNUTLS_E_INTERNAL_ERROR;
     }
 
-  resarr[5] = gcry_sexp_nth_mpi (list, 1, 0);
+  params->params[5] = gcry_sexp_nth_mpi (list, 1, 0);
 
   gcry_sexp_release (list);
   gcry_sexp_release (key);
 
-  _gnutls_mpi_log ("n: ", resarr[0]);
-  _gnutls_mpi_log ("e: ", resarr[1]);
-  _gnutls_mpi_log ("d: ", resarr[2]);
-  _gnutls_mpi_log ("p: ", resarr[3]);
-  _gnutls_mpi_log ("q: ", resarr[4]);
-  _gnutls_mpi_log ("u: ", resarr[5]);
+  _gnutls_mpi_log ("n: ", params->params[0]);
+  _gnutls_mpi_log ("e: ", params->params[1]);
+  _gnutls_mpi_log ("d: ", params->params[2]);
+  _gnutls_mpi_log ("p: ", params->params[3]);
+  _gnutls_mpi_log ("q: ", params->params[4]);
+  _gnutls_mpi_log ("u: ", params->params[5]);
 
   /* generate e1 and e2 */
 
-  *resarr_len = 6;
+  params->params_nr = 6;
 
-  tmp = _gnutls_mpi_alloc_like (resarr[0]);
-  if (tmp == NULL)
-    {
-      gnutls_assert ();
-      ret = GNUTLS_E_MEMORY_ERROR;
-      goto cleanup;
-    }
-
-  ret = _gnutls_calc_rsa_exp (resarr, 2 + *resarr_len);
+  ret = calc_rsa_exp (params);
   if (ret < 0)
     {
       gnutls_assert ();
@@ -748,13 +773,13 @@ _rsa_generate_params (bigint_t * resarr, int *resarr_len, int bits)
       goto cleanup;
     }
 
-  (*resarr_len) += 2;
+  params->params_nr += 2;
 
   return 0;
 
 cleanup:
-  for (i = 0; i < *resarr_len; i++)
-    _gnutls_mpi_release (&resarr[i]);
+  for (i = 0; i < params->params_nr; i++)
+    _gnutls_mpi_release (&params->params[i]);
 
   return ret;
 }
@@ -776,7 +801,7 @@ wrap_gcry_pk_generate_params (gnutls_pk_algorithm_t algo,
           gnutls_assert ();
           return GNUTLS_E_INTERNAL_ERROR;
         }
-      return _dsa_generate_params (params->params, &params->params_nr, level);
+      return _dsa_generate_params (params, level);
 
     case GNUTLS_PK_RSA:
       params->params_nr = RSA_PRIVATE_PARAMS;
@@ -785,7 +810,7 @@ wrap_gcry_pk_generate_params (gnutls_pk_algorithm_t algo,
           gnutls_assert ();
           return GNUTLS_E_INTERNAL_ERROR;
         }
-      return _rsa_generate_params (params->params, &params->params_nr, level);
+      return _rsa_generate_params (params, level);
 
     default:
       gnutls_assert ();
@@ -822,7 +847,7 @@ wrap_gcry_pk_fixup (gnutls_pk_algorithm_t algo,
       /* calculate exp1 [6] and exp2 [7] */
       _gnutls_mpi_release (&params->params[6]);
       _gnutls_mpi_release (&params->params[7]);
-      result = _gnutls_calc_rsa_exp (params->params, RSA_PRIVATE_PARAMS);
+      result = calc_rsa_exp (params);
       if (result < 0)
         {
           gnutls_assert ();
