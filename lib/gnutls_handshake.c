@@ -152,9 +152,10 @@ resume_copy_required_values (gnutls_session_t session)
   session->security_parameters.entity =
     session->internals.resumed_security_parameters.entity;
 
-  _gnutls_set_current_version (session,
-                               session->internals.resumed_security_parameters.
-                               version);
+  if (session->internals.resumed_security_parameters.pversion != NULL)
+    _gnutls_set_current_version (session,
+                                 session->internals.resumed_security_parameters.
+                                 pversion->id);
 
   session->security_parameters.cert_type =
     session->internals.resumed_security_parameters.cert_type;
@@ -1143,17 +1144,15 @@ _gnutls_send_empty_handshake (gnutls_session_t session,
 
 inline
 static int call_hook_func(gnutls_session_t session, gnutls_handshake_description_t type,
-                          unsigned incoming)
+                          int post, unsigned incoming)
 {
-  if (session->internals.h_hook == NULL)
-    return 0;
-  else 
+  if (session->internals.h_hook != NULL)
     {
-      if (session->internals.h_type == type || session->internals.h_type == GNUTLS_HANDSHAKE_ANY)
-        return session->internals.h_hook(session, type, incoming);
-
-      return 0;
+      if ((session->internals.h_type == type || session->internals.h_type == GNUTLS_HANDSHAKE_ANY) && 
+      	(session->internals.h_post == post || session->internals.h_post == GNUTLS_HOOK_BOTH))
+        return session->internals.h_hook(session, type, post, incoming);
     }
+  return 0;
 }
 
 /* This function sends a handshake message of type 'type' containing the
@@ -1165,7 +1164,7 @@ int
 _gnutls_send_handshake (gnutls_session_t session, mbuffer_st * bufel,
                         gnutls_handshake_description_t type)
 {
-  int ret;
+  int ret, ret2;
   uint8_t *data;
   uint32_t datasize, i_datasize;
   int pos = 0;
@@ -1222,14 +1221,15 @@ _gnutls_send_handshake (gnutls_session_t session, mbuffer_st * bufel,
         return ret;
       }
 
-  session->internals.last_handshake_out = type;
-
-  ret = call_hook_func(session, type, 0);
+  ret = call_hook_func(session, type, GNUTLS_HOOK_PRE, 0);
   if (ret < 0)
     {
       gnutls_assert ();
+      _mbuffer_xfree(&bufel);
       return ret;
     }
+
+  session->internals.last_handshake_out = type;
 
   ret = _gnutls_handshake_io_cache_int (session, type, bufel);
   if (ret < 0)
@@ -1261,6 +1261,13 @@ _gnutls_send_handshake (gnutls_session_t session, mbuffer_st * bufel,
       /* send cached messages */
       ret = _gnutls_handshake_io_write_flush (session);
       break;
+    }
+
+  ret2 = call_hook_func(session, type, GNUTLS_HOOK_POST, 0);
+  if (ret2 < 0)
+    {
+      gnutls_assert ();
+      return ret2;
     }
 
   return ret;
@@ -1371,7 +1378,7 @@ _gnutls_recv_handshake (gnutls_session_t session,
                         gnutls_handshake_description_t type,
                         unsigned int optional, gnutls_buffer_st* buf)
 {
-  int ret;
+  int ret, ret2;
   handshake_buffer_st hsk;
 
   ret =
@@ -1388,6 +1395,13 @@ _gnutls_recv_handshake (gnutls_session_t session,
     }
 
   session->internals.last_handshake_in = hsk.htype;
+
+  ret = call_hook_func(session, hsk.htype, GNUTLS_HOOK_PRE, 1);
+  if (ret < 0)
+    {
+      gnutls_assert ();
+      goto cleanup;
+    }
 
   ret = _gnutls_handshake_hash_add_recvd (session, hsk.htype,
                                               hsk.header, hsk.header_size,
@@ -1427,7 +1441,6 @@ _gnutls_recv_handshake (gnutls_session_t session,
           /* Signal our caller we have received a verification cookie
              and ClientHello needs to be sent again. */
           ret = 1;
-          goto cleanup;
         }
 	
       break;
@@ -1461,9 +1474,10 @@ _gnutls_recv_handshake (gnutls_session_t session,
       goto cleanup;
     }
 
-  ret = call_hook_func(session, hsk.htype, 1);
-  if (ret < 0)
+  ret2 = call_hook_func(session, hsk.htype, GNUTLS_HOOK_POST, 1);
+  if (ret2 < 0)
     {
+      ret = ret2;
       gnutls_assert ();
       goto cleanup;
     }
@@ -1927,7 +1941,7 @@ _gnutls_send_client_hello (gnutls_session_t session, int again)
       else
         {
           /* we are resuming a session */
-          hver = version_to_entry(session->internals.resumed_security_parameters.version);
+          hver = session->internals.resumed_security_parameters.pversion;
         }
 
       if (hver == NULL)

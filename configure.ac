@@ -21,7 +21,7 @@ dnl Process this file with autoconf to produce a configure script.
 # USA
 
 AC_PREREQ(2.61)
-AC_INIT([GnuTLS], [3.2.1], [bug-gnutls@gnu.org])
+AC_INIT([GnuTLS], [3.2.2], [bug-gnutls@gnu.org])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CANONICAL_HOST
@@ -206,11 +206,15 @@ AC_PROG_LIBTOOL
 
 dnl No fork on MinGW, disable some self-tests until we fix them.
 dnl Check clock_gettime and pthread_mutex_lock in libc (avoid linking to other libs)
-AC_CHECK_FUNCS([fork getrusage getpwuid_r daemon getpid clock_gettime pthread_mutex_lock],,)
+AC_CHECK_FUNCS([fork getrusage getpwuid_r nanosleep daemon getpid clock_gettime pthread_mutex_lock],,)
 AM_CONDITIONAL(HAVE_FORK, test "$ac_cv_func_fork" != "no")
 
 if test "$ac_cv_func_pthread_mutex_lock" != "yes";then
   AC_LIB_HAVE_LINKFLAGS(pthread,, [#include <pthread.h>], [pthread_mutex_lock (0);])
+fi
+
+if test "$ac_cv_func_nanosleep" != "yes";then
+  AC_LIB_HAVE_LINKFLAGS(rt,, [#include <time.h>], [nanosleep (0, 0);])
 fi
 
 AC_MSG_CHECKING([whether to build libdane])

@@ -1,18 +1,20 @@
 GnuTLS NEWS -- History of user-visible changes.                -*- outline -*-
 Copyright (C) 2000-2012 Free Software Foundation, Inc.
+Copyright (C) 2013 Nikos Mavrogiannopoulos
 See the end for copying conditions.
 
-* Version 3.2.2 (unreleased)
+* Version 3.2.2 (released 2013-07-14)
 
 ** libgnutls: Several optimizations in the related to packet processing
 subsystems.
 
-** libgnutls: DTLS replay protection can now be disabled.
+** libgnutls: DTLS replay detection can now be disabled (to be used
+in certain transport layers like SCTP).
 
 ** libgnutls: Fixes in SRTP extension generation when MKI is being
 used.
 
-** libgnutls: Added ability to set hooks prior to sending or receiving
+** libgnutls: Added ability to set hooks before or after sending or receiving
 any handshake message with gnutls_handshake_set_hook_function().
 
 ** API and ABI modifications:
@@ -114,9 +116,6 @@ gnutls_x509_trust_list_remove_cas: Added
 gnutls_session_get_desc: Added
 gnutls_privkey_sign_raw_data: Added
 gnutls_privkey_status: Added
-
-
-
 
 
 * Version 3.1.9 (released 2013-02-27)
