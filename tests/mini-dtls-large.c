@@ -225,6 +225,7 @@ server (int fd)
     /* see the Getting peer's information example */
     /* print_info(session); */
 
+    memset (buffer, 0xa5, sizeof(buffer));
     ret = gnutls_record_send(session, buffer, gnutls_dtls_get_data_mtu(session)+12);
     if (ret != GNUTLS_E_LARGE_PACKET)
        {
