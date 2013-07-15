@@ -30,17 +30,6 @@
 /* Functions that refer to the initialization of the libgcrypt library.
  */
 
-static struct gcry_thread_cbs gct = {
-  .option = (GCRY_THREAD_OPTION_PTHREAD | (GCRY_THREAD_OPTION_VERSION << 8)),
-  .init = NULL,
-  .select = NULL,
-  .waitpid = NULL,
-  .accept = NULL,
-  .connect = NULL,
-  .sendmsg = NULL,
-  .recvmsg = NULL,
-};
-
 int
 gnutls_crypto_init (void)
 {
@@ -48,16 +37,6 @@ gnutls_crypto_init (void)
   if (gcry_control (GCRYCTL_ANY_INITIALIZATION_P) == 0)
     {
       const char *p;
-
-      if (gnutls_mutex_init != NULL)
-        {
-          gct.mutex_init = gnutls_mutex_init;
-          gct.mutex_destroy = gnutls_mutex_deinit;
-          gct.mutex_lock = gnutls_mutex_lock;
-          gct.mutex_unlock = gnutls_mutex_unlock;
-
-          gcry_control (GCRYCTL_SET_THREAD_CBS, &gct);
-        }
 
       p = gcry_check_version (GNUTLS_MIN_LIBGCRYPT_VERSION);
 
