@@ -20,8 +20,8 @@
  *
  */
 
-/* This file contains the functions needed for RSA/DSA public key
- * encryption and signatures. 
+/* This file contains the functions needed for RSA/DSA/EC public key
+ * encryption and signatures.
  */
 
 
@@ -43,6 +43,53 @@
 
 int (*generate) (gnutls_pk_algorithm_t, unsigned int level /*bits */ ,
                  gnutls_pk_params_st *);
+
+static inline const char *get_supported_curve(int curve)
+{
+  switch (curve)
+    {
+      case GNUTLS_ECC_CURVE_SECP192R1:
+        return "secp192r1";
+      case GNUTLS_ECC_CURVE_SECP224R1:
+        return "secp224r1";
+      case GNUTLS_ECC_CURVE_SECP256R1:
+        return "secp256r1";
+      case GNUTLS_ECC_CURVE_SECP384R1:
+        return "secp384r1";
+      case GNUTLS_ECC_CURVE_SECP521R1:
+        return "secp521r1";
+      default:
+        return NULL;
+    }
+}
+
+static bigint_t
+_ecc_compute_point (int curve, bigint_t x, bigint_t y)
+{
+  int pbytes = gnutls_ecc_curve_get_size (curve);
+  bigint_t result;
+  bigint_t tmp;
+
+  result = gcry_mpi_set_ui (NULL, 04); /* uncompressed point */
+  if (!result)
+    return NULL;
+
+  tmp = gcry_mpi_new (pbytes * 8 + 8);
+  if (!tmp)
+    {
+      _gnutls_mpi_release (&result);
+      return NULL;
+    }
+
+  gcry_mpi_lshift (tmp, result, pbytes * 8);
+  _gnutls_mpi_add (result, tmp, x);
+
+  gcry_mpi_lshift (tmp, result, pbytes * 8);
+  _gnutls_mpi_add (result, tmp, y);
+
+  _gnutls_mpi_release (&tmp);
+  return result;
+}
 
 static int
 _wrap_gcry_pk_encrypt (gnutls_pk_algorithm_t algo,
@@ -244,6 +291,9 @@ _wrap_gcry_pk_sign (gnutls_pk_algorithm_t algo, gnutls_datum_t * signature,
   int rc = -1, ret;
   bigint_t hash;
   bigint_t res[2] = { NULL, NULL };
+  int curve_id = pk_params->flags;
+  bigint_t point;
+  const char *curve;
 
   if (_gnutls_mpi_scan_nz (&hash, vdata->data, vdata->size) != 0)
     {
@@ -254,6 +304,42 @@ _wrap_gcry_pk_sign (gnutls_pk_algorithm_t algo, gnutls_datum_t * signature,
   /* make a sexp from pkey */
   switch (algo)
     {
+    case GNUTLS_PK_EC: /* we do ECDSA */
+      curve = get_supported_curve(curve_id);
+      if (curve == NULL)
+        return gnutls_assert_val(GNUTLS_E_ECC_UNSUPPORTED_CURVE);
+
+      if (pk_params->params_nr >= 3)
+        {
+          point = _ecc_compute_point (curve_id,
+                                      pk_params->params[0],
+                                      pk_params->params[1]);
+          if (point == NULL)
+            {
+              gnutls_assert ();
+              ret = GNUTLS_E_INTERNAL_ERROR;
+              goto cleanup;
+            }
+          rc = gcry_sexp_build (&s_key, NULL,
+                                "(private-key(ecc(curve%s)(q%m)(d%m)))",
+                                curve,
+                                point,
+                                pk_params->params[2]);
+          _gnutls_mpi_release (&point);
+        }
+      else
+        {
+          gnutls_assert ();
+        }
+
+      if (gcry_sexp_build (&s_hash, NULL, "%m", hash))
+        {
+          gnutls_assert ();
+          ret = GNUTLS_E_INTERNAL_ERROR;
+          goto cleanup;
+        }
+
+      break;
     case GNUTLS_PK_DSA:
       if (pk_params->params_nr >= 5)
         rc = gcry_sexp_build (&s_key, NULL,
@@ -320,6 +406,7 @@ _wrap_gcry_pk_sign (gnutls_pk_algorithm_t algo, gnutls_datum_t * signature,
 
   switch (algo)
     {
+    case GNUTLS_PK_EC:
     case GNUTLS_PK_DSA:
       {
         list = gcry_sexp_find_token (s_sig, "r", 0);
@@ -409,6 +496,9 @@ _wrap_gcry_pk_verify (gnutls_pk_algorithm_t algo,
   int rc = -1, ret;
   bigint_t hash;
   bigint_t tmp[2] = { NULL, NULL };
+  int curve_id = pk_params->flags;
+  const char *curve;
+  bigint_t point;
 
   if (_gnutls_mpi_scan_nz (&hash, vdata->data, vdata->size) != 0)
     {
@@ -419,6 +509,34 @@ _wrap_gcry_pk_verify (gnutls_pk_algorithm_t algo,
   /* make a sexp from pkey */
   switch (algo)
     {
+    case GNUTLS_PK_EC:
+      curve = get_supported_curve(curve_id);
+      if (curve == NULL)
+        return gnutls_assert_val(GNUTLS_E_ECC_UNSUPPORTED_CURVE);
+
+      if (pk_params->params_nr >= 2)
+        {
+          point = _ecc_compute_point (curve_id,
+                                      pk_params->params[0],
+                                      pk_params->params[1]);
+          if (point == NULL)
+            {
+              gnutls_assert ();
+              ret = GNUTLS_E_INTERNAL_ERROR;
+              goto cleanup;
+            }
+          rc = gcry_sexp_build (&s_pkey, NULL,
+                                "(public-key(ecc(curve%s)(q%m)))",
+                                curve,
+                                point);
+          _gnutls_mpi_release (&point);
+        }
+      else
+        {
+          gnutls_assert ();
+        }
+
+      break;
     case GNUTLS_PK_DSA:
       if (pk_params->params_nr >= 4)
         rc = gcry_sexp_build (&s_pkey, NULL,
@@ -448,6 +566,27 @@ _wrap_gcry_pk_verify (gnutls_pk_algorithm_t algo,
 
   switch (algo)
     {
+    case GNUTLS_PK_EC:
+      /* put the data into a simple list */
+      if (gcry_sexp_build (&s_hash, NULL, "%m", hash))
+        {
+          gnutls_assert ();
+          ret = GNUTLS_E_INTERNAL_ERROR;
+          goto cleanup;
+        }
+
+      ret = _gnutls_decode_ber_rs (signature, &tmp[0], &tmp[1]);
+      if (ret < 0)
+        {
+          gnutls_assert ();
+          goto cleanup;
+        }
+      rc = gcry_sexp_build (&s_sig, NULL,
+                            "(sig-val(ecdsa(r%m)(s%m)))", tmp[0], tmp[1]);
+      _gnutls_mpi_release (&tmp[0]);
+      _gnutls_mpi_release (&tmp[1]);
+      break;
+
     case GNUTLS_PK_DSA:
       /* put the data into a simple list */
       if (gcry_sexp_build (&s_hash, NULL, "%m", hash))
@@ -522,6 +661,73 @@ cleanup:
 
   return ret;
 }
+
+static int
+_ecc_generate_params (gnutls_pk_params_st * params, int curve_id)
+{
+
+  int ret;
+  gcry_sexp_t parms, key, list;
+  const char *curve = get_supported_curve (curve_id);
+  int bits = gnutls_ecc_curve_get_size (curve_id) * 8;
+
+  ret = gcry_sexp_build (&parms, NULL, "(genkey(ecc(curve %s)))", curve);
+  if (ret != 0)
+    {
+      gnutls_assert ();
+      return GNUTLS_E_INTERNAL_ERROR;
+    }
+
+  /* generate the ECC key
+   */
+  ret = gcry_pk_genkey (&key, parms);
+  gcry_sexp_release (parms);
+
+  if (ret != 0)
+    {
+      gnutls_assert ();
+      return GNUTLS_E_INTERNAL_ERROR;
+    }
+
+  list = gcry_sexp_find_token (key, "d", 0);
+  if (list == NULL)
+    {
+      gnutls_assert ();
+      gcry_sexp_release (key);
+      return GNUTLS_E_INTERNAL_ERROR;
+    }
+
+  params->params[2] = gcry_sexp_nth_mpi (list, 1, GCRYMPI_FMT_USG);
+  gcry_sexp_release (list);
+
+  list = gcry_sexp_find_token (key, "q", 0);
+  if (list == NULL)
+    {
+      gnutls_assert ();
+      gcry_sexp_release (key);
+      return GNUTLS_E_INTERNAL_ERROR;
+    }
+
+  params->params[1] = gcry_sexp_nth_mpi (list, 1, GCRYMPI_FMT_USG);
+  params->params[0] = _gnutls_mpi_new (bits);
+
+  gcry_mpi_rshift(params->params[0], params->params[1], bits);
+  gcry_mpi_clear_highbit(params->params[0], bits);
+  gcry_mpi_clear_highbit(params->params[1], bits);
+  gcry_sexp_release (list);
+  gcry_sexp_release (key);
+
+  _gnutls_mpi_log ("x: ", params->params[0]);
+  _gnutls_mpi_log ("y: ", params->params[1]);
+  _gnutls_mpi_log ("d: ", params->params[2]);
+
+  params->flags = curve_id;
+  params->params_nr = 3;
+
+  return 0;
+
+}
+
 
 static int
 _dsa_generate_params (gnutls_pk_params_st * params, int bits)
@@ -806,6 +1012,15 @@ wrap_gcry_pk_generate_params (gnutls_pk_algorithm_t algo,
   switch (algo)
     {
 
+    case GNUTLS_PK_EC:
+      params->params_nr = ECC_PRIVATE_PARAMS;
+      if (params->params_nr > GNUTLS_MAX_PK_PARAMS)
+        {
+          gnutls_assert ();
+          return GNUTLS_E_INTERNAL_ERROR;
+        }
+      return _ecc_generate_params (params, level);
+
     case GNUTLS_PK_DSA:
       params->params_nr = DSA_PRIVATE_PARAMS;
       if (params->params_nr > GNUTLS_MAX_PK_PARAMS)
@@ -987,6 +1202,7 @@ static int wrap_gcry_hash_algorithm (gnutls_pk_algorithm_t pk,
   switch (pk)
     {
     case GNUTLS_PK_DSA:
+    case GNUTLS_PK_EC:
 
       me = _gnutls_dsa_q_to_hash (pk, issuer_params, NULL);
       if (hash_algo)
@@ -1068,6 +1284,90 @@ cleanup:
 
 }
 
+static int _wrap_gcry_pk_derive(gnutls_pk_algorithm_t algo, gnutls_datum_t * out,
+                                  const gnutls_pk_params_st * priv,
+                                  const gnutls_pk_params_st * pub)
+{
+  int ret;
+
+  switch (algo)
+    {
+    case GNUTLS_PK_EC:
+      {
+        const char * curve;
+        int rc;
+        gcry_ctx_t ctx;
+        gcry_mpi_t z1;
+        gcry_mpi_point_t point, point2;
+
+        out->data = NULL;
+
+        curve = get_supported_curve(priv->flags);
+        if (curve == NULL)
+          return gnutls_assert_val(GNUTLS_E_ECC_UNSUPPORTED_CURVE);
+
+        rc = gcry_mpi_ec_new (&ctx, NULL, curve);
+        if (rc != 0)
+          {
+            gnutls_assert ();
+            ret = GNUTLS_E_INTERNAL_ERROR;
+            goto cleanup;
+          }
+
+        z1 = gcry_mpi_set_ui (NULL, 1);
+        if (z1 == NULL)
+          {
+            gnutls_assert ();
+            ret = GNUTLS_E_INTERNAL_ERROR;
+            goto ecc_cleanup;
+          }
+
+        point = gcry_mpi_point_set (NULL, pub->params[0], pub->params[1], z1);
+        if (point == NULL)
+          {
+            gnutls_assert ();
+            ret = GNUTLS_E_INTERNAL_ERROR;
+            goto ecc_cleanup;
+          }
+
+        point2 = gcry_mpi_point_new (0);
+        if (point2 == NULL)
+          {
+            gnutls_assert ();
+            gcry_mpi_point_release(point);
+            ret = GNUTLS_E_INTERNAL_ERROR;
+            goto ecc_cleanup;
+          }
+
+        gcry_mpi_ec_mul (point2, priv->params[2], point, ctx);
+        gcry_mpi_point_release(point);
+
+        gcry_mpi_ec_get_affine (z1, NULL, point2, ctx);
+        gcry_mpi_point_release(point2);
+
+        ret = _gnutls_mpi_dprint_size (z1, out,
+                                       gnutls_ecc_curve_get_size(priv->flags));
+
+ecc_cleanup:
+        if (z1 != NULL)
+          gcry_mpi_release(z1);
+        gcry_ctx_release (ctx);
+        if (ret < 0) goto cleanup;
+        break;
+      }
+    default:
+      gnutls_assert ();
+      ret = GNUTLS_E_INTERNAL_ERROR;
+      goto cleanup;
+    }
+
+  ret = 0;
+
+cleanup:
+
+  return ret;
+}
+
 int crypto_pk_prio = INT_MAX;
 
 gnutls_crypto_pk_st _gnutls_pk_ops = {
@@ -1078,4 +1378,5 @@ gnutls_crypto_pk_st _gnutls_pk_ops = {
   .verify = _wrap_gcry_pk_verify,
   .generate = wrap_gcry_pk_generate_params,
   .pk_fixup_private_params = wrap_gcry_pk_fixup,
+  .derive = _wrap_gcry_pk_derive,
 };
