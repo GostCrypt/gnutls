@@ -266,6 +266,13 @@ _wrap_gcry_pk_sign (gnutls_pk_algorithm_t algo, gnutls_datum_t * signature,
           gnutls_assert ();
         }
 
+      if (gcry_sexp_build (&s_hash, NULL, "%m", hash))
+        {
+          gnutls_assert ();
+          ret = GNUTLS_E_INTERNAL_ERROR;
+          goto cleanup;
+        }
+
       break;
     case GNUTLS_PK_RSA:
       if (pk_params->params_nr >= 6)
@@ -277,6 +284,13 @@ _wrap_gcry_pk_sign (gnutls_pk_algorithm_t algo, gnutls_datum_t * signature,
       else
         {
           gnutls_assert ();
+        }
+
+      if (gcry_sexp_build (&s_hash, NULL, "(data (flags pkcs1) (value %m))", hash))
+        {
+          gnutls_assert ();
+          ret = GNUTLS_E_INTERNAL_ERROR;
+          goto cleanup;
         }
       break;
 
@@ -292,15 +306,6 @@ _wrap_gcry_pk_sign (gnutls_pk_algorithm_t algo, gnutls_datum_t * signature,
       ret = GNUTLS_E_INTERNAL_ERROR;
       goto cleanup;
     }
-
-  /* put the data into a simple list */
-  if (gcry_sexp_build (&s_hash, NULL, "%m", hash))
-    {
-      gnutls_assert ();
-      ret = GNUTLS_E_INTERNAL_ERROR;
-      goto cleanup;
-    }
-
 
   /* pass it to libgcrypt */
   rc = gcry_pk_sign (&s_sig, s_hash, s_key);
@@ -441,17 +446,17 @@ _wrap_gcry_pk_verify (gnutls_pk_algorithm_t algo,
       goto cleanup;
     }
 
-  /* put the data into a simple list */
-  if (gcry_sexp_build (&s_hash, NULL, "%m", hash))
-    {
-      gnutls_assert ();
-      ret = GNUTLS_E_INTERNAL_ERROR;
-      goto cleanup;
-    }
-
   switch (algo)
     {
     case GNUTLS_PK_DSA:
+      /* put the data into a simple list */
+      if (gcry_sexp_build (&s_hash, NULL, "%m", hash))
+        {
+          gnutls_assert ();
+          ret = GNUTLS_E_INTERNAL_ERROR;
+          goto cleanup;
+        }
+
       ret = _gnutls_decode_ber_rs (signature, &tmp[0], &tmp[1]);
       if (ret < 0)
         {
@@ -465,6 +470,13 @@ _wrap_gcry_pk_verify (gnutls_pk_algorithm_t algo,
       break;
 
     case GNUTLS_PK_RSA:
+      if (gcry_sexp_build (&s_hash, NULL, "(data (flags pkcs1) (value %m))", hash))
+        {
+          gnutls_assert ();
+          ret = GNUTLS_E_INTERNAL_ERROR;
+          goto cleanup;
+        }
+
       ret = _gnutls_mpi_scan_nz (&tmp[0], signature->data, signature->size);
       if (ret < 0)
         {
