@@ -872,9 +872,194 @@ wrap_gcry_pk_fixup (gnutls_pk_algorithm_t algo,
   return 0;
 }
 
+static int
+extract_digest_info (gcry_sexp_t key,
+                     gnutls_datum_t *di, uint8_t** rdi,
+                     gcry_sexp_t signature)
+{
+  unsigned i;
+  int ret;
+  gcry_error_t err;
+  gcry_sexp_t out, list;
+  bigint_t res;
+  size_t keysize = (gcry_pk_get_nbits (key) + 7)/ 8;
+
+  if (keysize == 0)
+    return 0;
+
+  err = gcry_pk_encrypt (&out, signature, key);
+  if (err != 0)
+    {
+      gnutls_assert ();
+      ret = GNUTLS_E_INTERNAL_ERROR;
+      goto cleanup;
+    }
+
+  list = gcry_sexp_find_token (out, "a", 0);
+  gcry_sexp_release (out);
+  if (list == NULL)
+    {
+      gnutls_assert ();
+      ret = GNUTLS_E_INTERNAL_ERROR;
+      goto cleanup;
+    }
+
+  res = gcry_sexp_nth_mpi (list, 1, GCRYMPI_FMT_USG);
+  gcry_sexp_release (list);
+  if (res == NULL)
+    {
+      gnutls_assert ();
+      ret = GNUTLS_E_INTERNAL_ERROR;
+      goto cleanup;
+    }
+
+  ret = _gnutls_mpi_dprint_size (res, di, keysize);
+  _gnutls_mpi_release (&res);
+  if (ret < 0)
+    {
+      gnutls_assert ();
+      goto cleanup;
+    }
+  *rdi = di->data;
+
+  if (di->data[0] != 0 || di->data[1] != 1)
+    {
+      ret = 0;
+      goto cleanup2;
+    }
+
+  for (i = 2; i < keysize; i++)
+    {
+      if (di->data[i] == 0 && i > 2)
+        break;
+
+      if (di->data[i] != 0xff)
+        {
+          ret = 0;
+          goto cleanup2;
+        }
+    }
+
+  i++;
+
+  di->data += i;
+  di->size -= i;
+
+  return 1;
+
+cleanup2:
+  gnutls_free(*rdi);
+cleanup:
+
+  return ret;
+}
+
+/* Given a signature and parameters, it should return
+ * the hash algorithm used in the signature. This is a kludge
+ * but until we deprecate gnutls_pubkey_get_verify_algorithm()
+ * we depend on it.
+ */
+static int wrap_gcry_hash_algorithm (gnutls_pk_algorithm_t pk,
+    const gnutls_datum_t * sig, gnutls_pk_params_st * issuer_params,
+    gnutls_digest_algorithm_t* hash_algo)
+{
+  uint8_t digest[MAX_HASH_SIZE];
+  uint8_t* rdi = NULL;
+  gnutls_datum_t di;
+  bigint_t s;
+  unsigned digest_size;
+  gcry_sexp_t s_pkey = NULL, s_data = NULL;
+  const mac_entry_st* me;
+  int ret;
+
+  switch (pk)
+    {
+    case GNUTLS_PK_DSA:
+
+      me = _gnutls_dsa_q_to_hash (pk, issuer_params, NULL);
+      if (hash_algo)
+        *hash_algo = me->id;
+
+      ret = 0;
+      break;
+    case GNUTLS_PK_RSA:
+      if (sig == NULL)
+        {                       /* return a sensible algorithm */
+          if (hash_algo)
+            *hash_algo = GNUTLS_DIG_SHA256;
+          return 0;
+        }
+
+      if (issuer_params->params_nr >= 2)
+        ret = gcry_sexp_build (&s_pkey, NULL,
+                              "(public-key(rsa(n%m)(e%m)))",
+                              issuer_params->params[0],
+                              issuer_params->params[1]);
+      else
+        return gnutls_assert_val(GNUTLS_E_PK_SIG_VERIFY_FAILED);
+
+      digest_size = sizeof(digest);
+
+      if (_gnutls_mpi_scan_nz (&s, sig->data, sig->size) != 0)
+        {
+          gnutls_assert ();
+          return GNUTLS_E_MPI_SCAN_FAILED;
+        }
+
+      /* put the data into a simple list */
+      ret = gcry_sexp_build (&s_data, NULL, "%m", s);
+      _gnutls_mpi_release (&s);
+      if (ret)
+        {
+          gnutls_assert ();
+          ret = GNUTLS_E_MEMORY_ERROR;
+          goto cleanup;
+        }
+
+      ret = extract_digest_info (s_pkey, &di, &rdi, s_data);
+      if (ret == 0)
+        {
+          ret = GNUTLS_E_PK_SIG_VERIFY_FAILED;
+          gnutls_assert ();
+          goto cleanup;
+        }
+
+      digest_size = sizeof(digest);
+      if ((ret =
+           decode_ber_digest_info (&di, hash_algo, digest,
+                                   &digest_size)) < 0)
+        {
+          gnutls_assert ();
+          goto cleanup;
+        }
+
+      if (digest_size != _gnutls_hash_get_algo_len (mac_to_entry(*hash_algo)))
+        {
+          gnutls_assert ();
+          ret = GNUTLS_E_PK_SIG_VERIFY_FAILED;
+          goto cleanup;
+        }
+
+      ret = 0;
+      break;
+
+    default:
+      gnutls_assert ();
+      ret = GNUTLS_E_INTERNAL_ERROR;
+    }
+
+cleanup:
+  gcry_sexp_release (s_pkey);
+  gcry_sexp_release (s_data);
+  gnutls_free(rdi);
+  return ret;
+
+}
+
 int crypto_pk_prio = INT_MAX;
 
 gnutls_crypto_pk_st _gnutls_pk_ops = {
+  .hash_algorithm = wrap_gcry_hash_algorithm,
   .encrypt = _wrap_gcry_pk_encrypt,
   .decrypt = _wrap_gcry_pk_decrypt,
   .sign = _wrap_gcry_pk_sign,
