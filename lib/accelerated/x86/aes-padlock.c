@@ -33,8 +33,8 @@
 #include <x86.h>
 #ifdef HAVE_LIBNETTLE
 #include <nettle/aes.h>         /* for key generation in 192 and 256 bits */
-#include <sha-padlock.h>
 #endif
+#include <sha-padlock.h>
 #include <aes-padlock.h>
 
 static int
@@ -175,6 +175,7 @@ check_padlock (void)
   return ((edx & (0x3 << 6)) == (0x3 << 6));
 }
 
+#ifdef HAVE_LIBNETTLE
 static int
 check_phe (void)
 {
@@ -209,6 +210,7 @@ check_phe_partial (void)
   else
     return 0;
 }
+#endif
 
 static unsigned
 check_via (void)
@@ -228,7 +230,10 @@ check_via (void)
 void
 register_padlock_crypto (void)
 {
-  int ret, phe;
+  int ret;
+#ifdef HAVE_LIBNETTLE
+  int phe;
+#endif
 
   if (check_via () == 0)
     return;
@@ -243,6 +248,7 @@ register_padlock_crypto (void)
           gnutls_assert ();
         }
 
+#ifdef HAVE_LIBNETTLE
       /* register GCM ciphers */
       ret =
         gnutls_crypto_single_cipher_register
@@ -251,7 +257,7 @@ register_padlock_crypto (void)
         {
           gnutls_assert ();
         }
-#ifdef HAVE_LIBNETTLE
+#endif
       ret =
         gnutls_crypto_single_cipher_register (GNUTLS_CIPHER_AES_192_CBC,
                                               80, &aes_padlock_struct);
@@ -268,6 +274,7 @@ register_padlock_crypto (void)
           gnutls_assert ();
         }
 
+#ifdef HAVE_LIBNETTLE
       ret =
         gnutls_crypto_single_cipher_register (GNUTLS_CIPHER_AES_256_GCM,
                                               80, &aes_gcm_padlock_struct);

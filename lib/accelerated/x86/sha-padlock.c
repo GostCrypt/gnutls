@@ -24,9 +24,11 @@
 #include <gnutls_int.h>
 #include <gnutls_hash_int.h>
 #include <gnutls_errors.h>
+#ifdef HAVE_LIBNETTLE
 #include <nettle/sha.h>
 #include <nettle/hmac.h>
 #include <nettle/macros.h>
+#endif
 #include <aes-padlock.h>
 #include <assert.h>
 #include <sha-padlock.h>

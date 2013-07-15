@@ -1,7 +1,13 @@
 #ifndef SHA_PADLOCK_H
 # define SHA_PADLOCK_H
 
+#ifdef HAVE_LIBNETTLE
 #include <nettle/sha.h>
+#else
+struct sha1_ctx;
+struct sha256_ctx;
+struct sha512_ctx;
+#endif
 
 void padlock_sha1_oneshot(void *ctx, const void *inp, size_t len);
 void padlock_sha256_oneshot(void *ctx, const void *inp, size_t len);
