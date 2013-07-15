@@ -201,6 +201,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module memchr-tests:
   # Code from module memmem-simple:
   # Code from module mempcpy:
+  # Code from module memxor:
   # Code from module minmax:
   # Code from module msvc-inval:
   # Code from module msvc-nothrow:
@@ -662,6 +663,7 @@ AC_SUBST([LTALLOCA])
     gl_PREREQ_MEMPCPY
   fi
   gl_STRING_MODULE_INDICATOR([mempcpy])
+  gl_MEMXOR
   gl_MINMAX
   gl_MSVC_INVAL
   if test $HAVE_MSVC_INVALID_PARAMETER_HANDLER = 1; then
@@ -1291,6 +1293,8 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/memchr.valgrind
   lib/memmem.c
   lib/mempcpy.c
+  lib/memxor.c
+  lib/memxor.h
   lib/minmax.h
   lib/msvc-inval.c
   lib/msvc-inval.h
@@ -1490,6 +1494,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/memchr.m4
   m4/memmem.m4
   m4/mempcpy.m4
+  m4/memxor.m4
   m4/minmax.m4
   m4/mmap-anon.m4
   m4/mode_t.m4
