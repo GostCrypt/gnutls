@@ -51,10 +51,20 @@ wrap_gcry_rnd (void *ctx, int level, void *data, size_t datasize)
   return 0;
 }
 
+static void
+wrap_gcry_rnd_refresh (void *ctx)
+{
+  char c;
+
+  gcry_create_nonce (&c, 1);
+  gcry_randomize (&c, 1, GCRY_STRONG_RANDOM);
+}
+
 int crypto_rnd_prio = INT_MAX;
 
 gnutls_crypto_rnd_st _gnutls_rnd_ops = {
   .init = wrap_gcry_rnd_init,
   .deinit = NULL,
   .rnd = wrap_gcry_rnd,
+  .rnd_refresh = wrap_gcry_rnd_refresh,
 };
