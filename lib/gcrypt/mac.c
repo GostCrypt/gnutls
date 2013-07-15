@@ -29,6 +29,25 @@
 #include <gcrypt.h>
 
 static int
+wrap_gcry_mac_exists (gnutls_mac_algorithm_t algo)
+{
+  switch (algo)
+    {
+    case GNUTLS_MAC_MD5:
+    case GNUTLS_MAC_SHA1:
+    case GNUTLS_MAC_RMD160:
+    case GNUTLS_MAC_MD2:
+    case GNUTLS_MAC_SHA224:
+    case GNUTLS_MAC_SHA256:
+    case GNUTLS_MAC_SHA384:
+    case GNUTLS_MAC_SHA512:
+      return 1;
+    default:
+      return 0;
+    }
+}
+
+static int
 wrap_gcry_mac_init (gnutls_mac_algorithm_t algo, void **ctx)
 {
   int err;
@@ -47,6 +66,9 @@ wrap_gcry_mac_init (gnutls_mac_algorithm_t algo, void **ctx)
       break;
     case GNUTLS_MAC_MD2:
       err = gcry_md_open ((gcry_md_hd_t *) ctx, GCRY_MD_MD2, flags);
+      break;
+    case GNUTLS_MAC_SHA224:
+      err = gcry_md_open ((gcry_md_hd_t *) ctx, GCRY_MD_SHA224, flags);
       break;
     case GNUTLS_MAC_SHA256:
       err = gcry_md_open ((gcry_md_hd_t *) ctx, GCRY_MD_SHA256, flags);
@@ -82,26 +104,33 @@ wrap_gcry_md_write (void *ctx, const void *text, size_t textsize)
   return GNUTLS_E_SUCCESS;
 }
 
-static int
-wrap_gcry_md_copy (void **bhd, void *ahd)
-{
-  return gcry_md_copy ((gcry_md_hd_t *) bhd, (gcry_md_hd_t) ahd);
-}
-
 static void
 wrap_gcry_md_close (void *hd)
 {
   gcry_md_close (hd);
 }
 
-static void
-wrap_gcry_md_reset (void *hd)
+static int
+wrap_gcry_hash_exists (gnutls_digest_algorithm_t algo)
 {
-  gcry_md_reset (hd);
+  switch (algo)
+    {
+    case GNUTLS_DIG_MD5:
+    case GNUTLS_DIG_SHA1:
+    case GNUTLS_DIG_RMD160:
+    case GNUTLS_DIG_MD2:
+    case GNUTLS_DIG_SHA224:
+    case GNUTLS_DIG_SHA256:
+    case GNUTLS_DIG_SHA384:
+    case GNUTLS_DIG_SHA512:
+      return 1;
+    default:
+      return 0;
+    }
 }
 
 static int
-wrap_gcry_hash_init (gnutls_mac_algorithm_t algo, void **ctx)
+wrap_gcry_hash_init (gnutls_digest_algorithm_t algo, void **ctx)
 {
   int err;
   unsigned int flags = 0;
@@ -147,7 +176,7 @@ wrap_gcry_hash_init (gnutls_mac_algorithm_t algo, void **ctx)
 static int
 wrap_gcry_mac_output (void *src_ctx, void *digest, size_t digestsize)
 {
-  opaque *_digest = gcry_md_read (src_ctx, 0);
+  unsigned char *_digest = gcry_md_read (src_ctx, 0);
 
   if (_digest != NULL)
     {
@@ -163,21 +192,70 @@ wrap_gcry_mac_output (void *src_ctx, void *digest, size_t digestsize)
   return GNUTLS_E_HASH_FAILED;
 }
 
+static int wrap_gcry_mac_fast(gnutls_mac_algorithm_t algo,
+  const void* nonce, size_t nonce_size,
+  const void *key, size_t key_size,
+  const void* text, size_t text_size,
+  void* digest)
+{
+  gcry_md_hd_t ctx;
+  int ret;
+  unsigned char *_digest;
+  unsigned int len;
+
+  ret = wrap_gcry_mac_init (algo, (void **)&ctx);
+  if (ret < 0)
+    return gnutls_assert_val(ret);
+  gcry_md_setkey (ctx, key, key_size);
+  gcry_md_write (ctx, text, text_size);
+  _digest = gcry_md_read (ctx, 0);
+  len = gcry_md_get_algo_dlen (gcry_md_get_algo (ctx));
+  if (_digest != NULL)
+    memcpy (digest, _digest, len);
+  gcry_md_close (ctx);
+
+  return _digest ? 0 : gnutls_assert_val(GNUTLS_E_HASH_FAILED);
+}
+
+static int wrap_gcry_hash_fast(gnutls_digest_algorithm_t algo,
+  const void* text, size_t text_size,
+  void* digest)
+{
+  gcry_md_hd_t ctx;
+  int ret;
+  unsigned char *_digest;
+  unsigned int len;
+
+  ret = wrap_gcry_hash_init (algo, (void **)&ctx);
+  if (ret < 0)
+    return gnutls_assert_val(ret);
+  gcry_md_write (ctx, text, text_size);
+  _digest = gcry_md_read (ctx, 0);
+  len = gcry_md_get_algo_dlen (gcry_md_get_algo (ctx));
+  if (_digest != NULL)
+    memcpy (digest, _digest, len);
+  gcry_md_close (ctx);
+
+  return _digest ? 0 : gnutls_assert_val(GNUTLS_E_HASH_FAILED);
+}
+
+
 
 gnutls_crypto_mac_st _gnutls_mac_ops = {
   .init = wrap_gcry_mac_init,
   .setkey = wrap_gcry_md_setkey,
   .hash = wrap_gcry_md_write,
-  .reset = wrap_gcry_md_reset,
   .output = wrap_gcry_mac_output,
   .deinit = wrap_gcry_md_close,
+  .fast = wrap_gcry_mac_fast,
+  .exists = wrap_gcry_mac_exists,
 };
 
 gnutls_crypto_digest_st _gnutls_digest_ops = {
   .init = wrap_gcry_hash_init,
   .hash = wrap_gcry_md_write,
-  .copy = wrap_gcry_md_copy,
-  .reset = wrap_gcry_md_reset,
   .output = wrap_gcry_mac_output,
   .deinit = wrap_gcry_md_close,
+  .fast = wrap_gcry_hash_fast,
+  .exists = wrap_gcry_hash_exists,
 };
