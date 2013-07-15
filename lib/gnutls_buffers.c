@@ -509,7 +509,10 @@ _gnutls_io_read_buffered (gnutls_session_t session, size_t total,
         }
 
       if (ret == 0) /* EOF */
-        return gnutls_assert_val(0);
+        {
+          _mbuffer_xfree(&bufel);
+          return gnutls_assert_val(0);
+        }
 
 	/* copy fresh data to our buffer.
          */
