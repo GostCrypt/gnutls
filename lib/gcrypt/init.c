@@ -59,3 +59,8 @@ gnutls_crypto_init (void)
 
   return 0;
 }
+
+void
+gnutls_crypto_deinit (void)
+{
+}
