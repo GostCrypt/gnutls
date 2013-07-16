@@ -1045,6 +1045,12 @@ wrap_gcry_pk_generate_params (gnutls_pk_algorithm_t algo,
     }
 }
 
+static int
+wrap_gcry_pk_verify_params (gnutls_pk_algorithm_t algo,
+                            const gnutls_pk_params_st * params)
+{
+  return gnutls_assert_val(GNUTLS_E_INVALID_REQUEST);
+}
 
 static int
 wrap_gcry_pk_fixup (gnutls_pk_algorithm_t algo,
@@ -1377,6 +1383,7 @@ gnutls_crypto_pk_st _gnutls_pk_ops = {
   .sign = _wrap_gcry_pk_sign,
   .verify = _wrap_gcry_pk_verify,
   .generate = wrap_gcry_pk_generate_params,
+  .verify_params = wrap_gcry_pk_verify_params,
   .pk_fixup_private_params = wrap_gcry_pk_fixup,
   .derive = _wrap_gcry_pk_derive,
 };

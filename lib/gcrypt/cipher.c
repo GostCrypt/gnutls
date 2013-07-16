@@ -174,6 +174,18 @@ wrap_gcry_cipher_encrypt (void *ctx, const void *plain, size_t plainsize,
   return GNUTLS_E_ENCRYPTION_FAILED;
 }
 
+static int
+wrap_gcry_cipher_auth (void *ctx, const void *plain, size_t plainsize)
+{
+  return gnutls_assert_val(GNUTLS_E_INVALID_REQUEST);
+}
+
+static void
+wrap_gcry_cipher_tag (void *ctx, void *tag, size_t tagsize)
+{
+  gnutls_assert();
+}
+
 static void
 wrap_gcry_cipher_close (void *h)
 {
@@ -189,4 +201,6 @@ gnutls_crypto_cipher_st _gnutls_cipher_ops = {
   .encrypt = wrap_gcry_cipher_encrypt,
   .decrypt = wrap_gcry_cipher_decrypt,
   .deinit = wrap_gcry_cipher_close,
+  .auth = wrap_gcry_cipher_auth,
+  .tag = wrap_gcry_cipher_tag,
 };

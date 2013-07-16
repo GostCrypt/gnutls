@@ -98,6 +98,13 @@ wrap_gcry_md_setkey (void *ctx, const void *key, size_t keylen)
 }
 
 static int
+wrap_gcry_mac_set_nonce (void *ctx, const void *nonce, size_t noncelen)
+{
+  return gnutls_assert_val(GNUTLS_E_INVALID_REQUEST);
+}
+
+
+static int
 wrap_gcry_md_write (void *ctx, const void *text, size_t textsize)
 {
   gcry_md_write (ctx, text, textsize);
@@ -244,6 +251,7 @@ static int wrap_gcry_hash_fast(gnutls_digest_algorithm_t algo,
 gnutls_crypto_mac_st _gnutls_mac_ops = {
   .init = wrap_gcry_mac_init,
   .setkey = wrap_gcry_md_setkey,
+  .setnonce = wrap_gcry_mac_set_nonce,
   .hash = wrap_gcry_md_write,
   .output = wrap_gcry_mac_output,
   .deinit = wrap_gcry_md_close,
