@@ -898,7 +898,7 @@ gnutls_priority_init (gnutls_priority_t * priority_cache,
           if (broken_list[i][0] == '+')
             {
               fn = prio_add;
-              bulk_fn = _set_priority;
+              bulk_fn = _add_priority;
             }
           else
             {
@@ -1285,6 +1285,69 @@ gnutls_priority_ecc_curve_list (gnutls_priority_t pcache, const unsigned int** l
   
   *list = pcache->supported_ecc.priority;
   return pcache->supported_ecc.algorithms;
+}
+
+/**
+ * gnutls_priority_kx_list:
+ * @pcache: is a #gnutls_prioritity_t structure.
+ * @list: will point to an integer list
+ *
+ * Get a list of available key exchange methods in the priority
+ * structure. 
+ *
+ * Returns: the number of curves, or an error code.
+ * Since: 3.2.3
+ **/
+int
+gnutls_priority_kx_list (gnutls_priority_t pcache, const unsigned int** list)
+{
+  if (pcache->kx.algorithms == 0)
+    return 0;
+  
+  *list = pcache->kx.priority;
+  return pcache->kx.algorithms;
+}
+
+/**
+ * gnutls_priority_cipher_list:
+ * @pcache: is a #gnutls_prioritity_t structure.
+ * @list: will point to an integer list
+ *
+ * Get a list of available ciphers in the priority
+ * structure. 
+ *
+ * Returns: the number of curves, or an error code.
+ * Since: 3.2.3
+ **/
+int
+gnutls_priority_cipher_list (gnutls_priority_t pcache, const unsigned int** list)
+{
+  if (pcache->cipher.algorithms == 0)
+    return 0;
+  
+  *list = pcache->cipher.priority;
+  return pcache->cipher.algorithms;
+}
+
+/**
+ * gnutls_priority_mac_list:
+ * @pcache: is a #gnutls_prioritity_t structure.
+ * @list: will point to an integer list
+ *
+ * Get a list of available MAC algorithms in the priority
+ * structure. 
+ *
+ * Returns: the number of curves, or an error code.
+ * Since: 3.2.3
+ **/
+int
+gnutls_priority_mac_list (gnutls_priority_t pcache, const unsigned int** list)
+{
+  if (pcache->mac.algorithms == 0)
+    return 0;
+  
+  *list = pcache->mac.priority;
+  return pcache->mac.algorithms;
 }
 
 /**

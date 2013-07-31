@@ -501,7 +501,7 @@ _gnutls_send_tlen_int (gnutls_session_t session, content_type_t type,
     }
   else
     {
-      if (unlikely(send_data_size == 0))
+      if (unlikely((send_data_size == 0 && target_length == 0)))
         return gnutls_assert_val(GNUTLS_E_INTERNAL_ERROR);
 
       /* now proceed to packet encryption
@@ -933,18 +933,6 @@ cleanup:
 
 }
 
-int _gnutls_get_max_decrypted_data(gnutls_session_t session)
-{
-int ret;
-
-  if (gnutls_compression_get (session) != GNUTLS_COMP_NULL ||
-      session->internals.priorities.allow_large_records != 0)
-    ret = MAX_RECORD_RECV_SIZE(session) + EXTRA_COMP_SIZE;
-  else
-    ret = MAX_RECORD_RECV_SIZE(session);
-
-  return ret;
-}
 
 /* Checks the record headers and returns the length, version and
  * content type.
@@ -1193,8 +1181,7 @@ begin:
   /* We allocate the maximum possible to allow few compressed bytes to expand to a
    * full record.
    */
-  decrypted = _mbuffer_alloc(MAX_RECORD_RECV_SIZE(session), 
-                             MAX_RECORD_RECV_SIZE(session));
+  decrypted = _mbuffer_alloc(record.length, record.length);
   if (decrypted == NULL)
     return gnutls_assert_val(GNUTLS_E_MEMORY_ERROR);
 

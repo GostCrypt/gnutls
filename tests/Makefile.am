@@ -60,8 +60,8 @@ libutils_la_SOURCES = utils.h utils.c
 libutils_la_LIBADD = ../gl/libgnu.la
 
 ctests = mini-deflate simple gc set_pkcs12_cred certder certuniqueid	\
-	 mpi certificate_set_x509_crl dn parse_ca moredn mini		\
-	 hostname-check cve-2008-4989 pkcs12_s2k chainverify		\
+	 mpi certificate_set_x509_crl dn parse_ca moredn record-sizes \
+	 hostname-check cve-2008-4989 pkcs12_s2k chainverify record-sizes-range \
 	 crq_key_id x509sign-verify cve-2009-1415 cve-2009-1416		\
 	 crq_apis init_roundtrip pkcs12_s2k_pem dn2 mini-eagain		\
 	 nul-in-x509-names x509_altname pkcs12_encode mini-x509		\
@@ -70,7 +70,7 @@ ctests = mini-deflate simple gc set_pkcs12_cred certder certuniqueid	\
 	 mini-tdb mini-dtls-rehandshake mini-alpn mini-dtls-large \
 	 mini-termination mini-x509-cas mini-x509-2 pkcs12_simple \
 	 mini-emsgsize-dtls chainverify-unsorted mini-overhead \
-	 mini-dtls-heartbeat mini-x509-callbacks key-openssl		\
+	 mini-dtls-heartbeat mini-x509-callbacks key-openssl priorities	\
 	 mini-dtls-srtp mini-xssl rsa-encrypt-decrypt mini-loss-time \
 	 mini-record mini-dtls-record mini-handshake-timeout mini-record-range
 

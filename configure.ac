@@ -21,7 +21,7 @@ dnl Process this file with autoconf to produce a configure script.
 # USA
 
 AC_PREREQ(2.61)
-AC_INIT([GnuTLS], [3.2.2], [bug-gnutls@gnu.org])
+AC_INIT([GnuTLS], [3.2.3], [bug-gnutls@gnu.org])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CANONICAL_HOST
@@ -206,7 +206,7 @@ AC_PROG_LIBTOOL
 
 dnl No fork on MinGW, disable some self-tests until we fix them.
 dnl Check clock_gettime and pthread_mutex_lock in libc (avoid linking to other libs)
-AC_CHECK_FUNCS([fork getrusage getpwuid_r nanosleep daemon getpid clock_gettime pthread_mutex_lock],,)
+AC_CHECK_FUNCS([fork getrusage getpwuid_r nanosleep daemon getpid clock_gettime pthread_mutex_lock iconv],,)
 AM_CONDITIONAL(HAVE_FORK, test "$ac_cv_func_fork" != "no")
 
 if test "$ac_cv_func_pthread_mutex_lock" != "yes";then
@@ -215,6 +215,22 @@ fi
 
 if test "$ac_cv_func_nanosleep" != "yes";then
   AC_LIB_HAVE_LINKFLAGS(rt,, [#include <time.h>], [nanosleep (0, 0);])
+fi
+
+ac_have_unicode=no
+if test "$ac_cv_func_iconv" != "yes";then
+  AC_LIB_HAVE_LINKFLAGS(iconv,, [#include <iconv.h>], [iconv (0, 0, 0, 0, 0);])
+  if test "$HAVE_LIBICONV" = "yes";then
+    ac_have_unicode=yes
+  fi
+else
+  ac_have_unicode=yes
+fi
+
+if test "$ac_have_unicode" != "yes";then
+  if test "$have_win" = "yes";then
+    ac_have_unicode=yes
+  fi
 fi
 
 AC_MSG_CHECKING([whether to build libdane])
@@ -424,7 +440,7 @@ AC_ARG_ENABLE(guile,
 opt_guile_bindings=$enableval)
 AC_MSG_RESULT($opt_guile_bindings)
 
-AC_ARG_WITH([--with-guile-site-dir],
+AC_ARG_WITH([guile-site-dir],
   [AS_HELP_STRING([--with-guile-site-dir],
      [use the given directory as the Guile site (use with care)])])
 
@@ -668,6 +684,7 @@ if features are disabled)
   Anon auth support:    $ac_enable_anon
   Heartbeat support:    $ac_enable_heartbeat
   RSA-EXPORT compat:    $ac_enable_rsa_export
+  Unicode support:      $ac_have_unicode
 ])
 
 AC_MSG_NOTICE([Optional applications:

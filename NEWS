@@ -3,6 +3,25 @@ Copyright (C) 2000-2012 Free Software Foundation, Inc.
 Copyright (C) 2013 Nikos Mavrogiannopoulos
 See the end for copying conditions.
 
+* Version 3.2.3 (released 2013-07-30)
+
+** libgnutls: Fixes in parsing of priority strings. Patch by Stefan Buehler.
+
+** libgnutls: Solve issue with received TLS packets that exceed 2^14. 
+(this fixes a bug that was accidentally introduced in 3.2.2)
+
+** libgnutls: Removed gnulib modules under LGPLv3 that could possibly be
+used by the library.
+
+** libgnutls: Fixes in gnutls_record_send_range(). Report and initial fix by 
+Alfredo Pironti.
+
+** API and ABI modifications:
+gnutls_priority_kx_list: Added
+gnutls_priority_mac_list: Added
+gnutls_priority_cipher_list: Added
+
+
 * Version 3.2.2 (released 2013-07-14)
 
 ** libgnutls: Several optimizations in the related to packet processing
