@@ -47,6 +47,7 @@ static int wrap_gcry_cipher_exists(gnutls_cipher_algorithm_t algo)
     case GNUTLS_CIPHER_CAMELLIA_128_CBC:
     case GNUTLS_CIPHER_CAMELLIA_192_CBC:
     case GNUTLS_CIPHER_CAMELLIA_256_CBC:
+    case GNUTLS_CIPHER_SALSA20_256:
       return 1;
     default:
       return 0;
@@ -119,6 +120,11 @@ wrap_gcry_cipher_init (gnutls_cipher_algorithm_t algo, void **ctx, int enc)
       err =
         gcry_cipher_open ((gcry_cipher_hd_t *) ctx, GCRY_CIPHER_CAMELLIA256,
                           GCRY_CIPHER_MODE_CBC, 0);
+      break;
+    case GNUTLS_CIPHER_SALSA20_256:
+      err =
+        gcry_cipher_open ((gcry_cipher_hd_t *) ctx, GCRY_CIPHER_SALSA20,
+                          GCRY_CIPHER_MODE_STREAM, 0);
       break;
     default:
       gnutls_assert ();
