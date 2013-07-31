@@ -1047,9 +1047,94 @@ wrap_gcry_pk_generate_params (gnutls_pk_algorithm_t algo,
 
 static int
 wrap_gcry_pk_verify_params (gnutls_pk_algorithm_t algo,
-                            const gnutls_pk_params_st * params)
+                            const gnutls_pk_params_st * pk_params)
 {
-  return gnutls_assert_val(GNUTLS_E_INVALID_REQUEST);
+  gcry_sexp_t s_key = NULL;
+  int rc = -1, ret;
+  int curve_id = pk_params->flags;
+  bigint_t point;
+  const char *curve;
+
+  switch (algo)
+    {
+    case GNUTLS_PK_EC: /* we do ECDSA */
+      curve = get_supported_curve(curve_id);
+      if (curve == NULL)
+        return gnutls_assert_val(GNUTLS_E_ECC_UNSUPPORTED_CURVE);
+
+      if (pk_params->params_nr >= 3)
+        {
+          point = _ecc_compute_point (curve_id,
+                                      pk_params->params[0],
+                                      pk_params->params[1]);
+          if (point == NULL)
+            {
+              gnutls_assert ();
+              ret = GNUTLS_E_INTERNAL_ERROR;
+              goto cleanup;
+            }
+          rc = gcry_sexp_build (&s_key, NULL,
+                                "(private-key(ecc(curve%s)(q%m)(d%m)))",
+                                curve,
+                                point,
+                                pk_params->params[2]);
+          _gnutls_mpi_release (&point);
+        }
+      else
+        {
+          gnutls_assert ();
+        }
+
+      break;
+    case GNUTLS_PK_DSA:
+      if (pk_params->params_nr >= 5)
+        rc = gcry_sexp_build (&s_key, NULL,
+                              "(private-key(dsa(p%m)(q%m)(g%m)(y%m)(x%m)))",
+                              pk_params->params[0], pk_params->params[1],
+                              pk_params->params[2], pk_params->params[3],
+                              pk_params->params[4]);
+      else
+        {
+          gnutls_assert ();
+        }
+
+      break;
+    case GNUTLS_PK_RSA:
+      if (pk_params->params_nr >= 6)
+        rc = gcry_sexp_build (&s_key, NULL,
+                              "(private-key(rsa((n%m)(e%m)(d%m)(p%m)(q%m)(u%m))))",
+                              pk_params->params[0], pk_params->params[1],
+                              pk_params->params[2], pk_params->params[3],
+                              pk_params->params[4], pk_params->params[5]);
+      else
+        {
+          gnutls_assert ();
+        }
+      break;
+
+    default:
+      gnutls_assert ();
+      ret = GNUTLS_E_INTERNAL_ERROR;
+      goto cleanup;
+    }
+
+  rc = gcry_pk_testkey (s_key);
+  if (rc != 0)
+    {
+      gnutls_assert ();
+      ret = GNUTLS_E_ILLEGAL_PARAMETER;
+      goto cleanup;
+    }
+
+  ret = 0;
+
+cleanup:
+  if (s_key)
+    gcry_sexp_release (s_key);
+
+  return ret;
+
+  return 0;
 }
 
 static int
