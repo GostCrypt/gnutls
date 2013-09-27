@@ -21,8 +21,6 @@
 #include <config.h>
 
 /* Gnulib portability files. */
-#include <version-etc.h>
-#include <progname.h>
 
 #ifndef ENABLE_PSK
 
@@ -77,8 +75,6 @@ main (int argc, char **argv)
   gnutls_datum_t dkey;
   const char* passwd, *username;
   size_t hex_key_size = sizeof (hex_key);
-
-  set_program_name (argv[0]);
 
   if ((ret = gnutls_global_init ()) < 0)
     {

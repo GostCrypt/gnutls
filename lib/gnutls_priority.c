@@ -311,13 +311,7 @@ static const int kx_priority_performance[] = {
   0
 };
 
-static const int kx_priority_suiteb[] = {
-  GNUTLS_KX_ECDHE_ECDSA,
-  0
-};
-
-static const int kx_priority_export[] = {
-  GNUTLS_KX_RSA,
+static const int kx_priority_pfs[] = {
 #ifdef ENABLE_ECDHE
   GNUTLS_KX_ECDHE_ECDSA,
   GNUTLS_KX_ECDHE_RSA,
@@ -326,6 +320,11 @@ static const int kx_priority_export[] = {
   GNUTLS_KX_DHE_RSA,
   GNUTLS_KX_DHE_DSS,
 #endif
+  0
+};
+
+static const int kx_priority_suiteb[] = {
+  GNUTLS_KX_ECDHE_ECDSA,
   0
 };
 
@@ -351,46 +350,22 @@ static const int kx_priority_secure[] = {
   0
 };
 
-static const int cipher_priority_performance_sw[] = {
-  GNUTLS_CIPHER_ARCFOUR_128,
-  GNUTLS_CIPHER_AES_128_CBC,
-  GNUTLS_CIPHER_CAMELLIA_128_CBC,
-  GNUTLS_CIPHER_AES_256_CBC,
-  GNUTLS_CIPHER_CAMELLIA_256_CBC,
-  GNUTLS_CIPHER_3DES_CBC,
-  GNUTLS_CIPHER_AES_128_GCM,
-  GNUTLS_CIPHER_AES_256_GCM,
-  0
-};
-
 /* If GCM and AES acceleration is available then prefer
  * them over anything else.
  */
-static const int cipher_priority_performance_hw_aes[] = {
+static const int cipher_priority_performance[] = {
+  GNUTLS_CIPHER_ARCFOUR_128,
   GNUTLS_CIPHER_AES_128_GCM,
   GNUTLS_CIPHER_AES_128_CBC,
   GNUTLS_CIPHER_AES_256_GCM,
   GNUTLS_CIPHER_AES_256_CBC,
-  GNUTLS_CIPHER_ARCFOUR_128,
   GNUTLS_CIPHER_CAMELLIA_128_CBC,
   GNUTLS_CIPHER_CAMELLIA_256_CBC,
   GNUTLS_CIPHER_3DES_CBC,
   0
 };
 
-static const int cipher_priority_normal_sw[] = {
-  GNUTLS_CIPHER_AES_128_CBC,
-  GNUTLS_CIPHER_CAMELLIA_128_CBC,
-  GNUTLS_CIPHER_AES_128_GCM,
-  GNUTLS_CIPHER_AES_256_CBC,
-  GNUTLS_CIPHER_CAMELLIA_256_CBC,
-  GNUTLS_CIPHER_AES_256_GCM,
-  GNUTLS_CIPHER_3DES_CBC,
-  GNUTLS_CIPHER_ARCFOUR_128,
-  0
-};
-
-static const int cipher_priority_normal_hw_aes[] = {
+static const int cipher_priority_normal[] = {
   GNUTLS_CIPHER_AES_128_GCM,
   GNUTLS_CIPHER_AES_128_CBC,
   GNUTLS_CIPHER_AES_256_GCM,
@@ -401,10 +376,6 @@ static const int cipher_priority_normal_hw_aes[] = {
   GNUTLS_CIPHER_ARCFOUR_128,
   0
 };
-
-static const int *cipher_priority_performance = cipher_priority_performance_sw;
-static const int *cipher_priority_normal = cipher_priority_normal_sw;
-
 
 static const int cipher_priority_suiteb128[] = {
   GNUTLS_CIPHER_AES_128_GCM,
@@ -433,19 +404,6 @@ static const int cipher_priority_secure192[] = {
   GNUTLS_CIPHER_AES_256_CBC,
   GNUTLS_CIPHER_CAMELLIA_256_CBC,
   GNUTLS_CIPHER_AES_256_GCM,
-  0
-};
-
-/* The same as cipher_priority_security_normal + arcfour-40. */
-static const int cipher_priority_export[] = {
-  GNUTLS_CIPHER_AES_128_CBC,
-  GNUTLS_CIPHER_AES_256_CBC,
-  GNUTLS_CIPHER_CAMELLIA_128_CBC,
-  GNUTLS_CIPHER_CAMELLIA_256_CBC,
-  GNUTLS_CIPHER_AES_128_GCM,
-  GNUTLS_CIPHER_3DES_CBC,
-  GNUTLS_CIPHER_ARCFOUR_128,
-  GNUTLS_CIPHER_ARCFOUR_40,
   0
 };
 
@@ -639,6 +597,7 @@ gnutls_priority_set (gnutls_session_t session, gnutls_priority_t priority)
 
 #define LEVEL_NONE "NONE"
 #define LEVEL_NORMAL "NORMAL"
+#define LEVEL_PFS "PFS"
 #define LEVEL_PERFORMANCE "PERFORMANCE"
 #define LEVEL_SECURE128 "SECURE128"
 #define LEVEL_SECURE192 "SECURE192"
@@ -673,6 +632,19 @@ bulk_rmadd_func *func;
     {
       func (&priority_cache->cipher, cipher_priority_normal);
       func (&priority_cache->kx, kx_priority_secure);
+      func (&priority_cache->mac, mac_priority_normal);
+      func (&priority_cache->sign_algo,
+                     sign_priority_default);
+      func (&priority_cache->supported_ecc, supported_ecc_normal);
+
+      if (priority_cache->level == 0)
+        priority_cache->level = GNUTLS_SEC_PARAM_VERY_WEAK;
+      return 1;
+    }
+  else if (strcasecmp (level, LEVEL_PFS) == 0)
+    {
+      func (&priority_cache->cipher, cipher_priority_normal);
+      func (&priority_cache->kx, kx_priority_pfs);
       func (&priority_cache->mac, mac_priority_normal);
       func (&priority_cache->sign_algo,
                      sign_priority_default);
@@ -746,8 +718,8 @@ bulk_rmadd_func *func;
     }
   else if (strcasecmp (level, LEVEL_EXPORT) == 0)
     {
-      func (&priority_cache->cipher, cipher_priority_export);
-      func (&priority_cache->kx, kx_priority_export);
+      func (&priority_cache->cipher, cipher_priority_performance);
+      func (&priority_cache->kx, kx_priority_performance);
       func (&priority_cache->mac, mac_priority_secure128);
       func (&priority_cache->sign_algo,
                      sign_priority_default);
@@ -774,6 +746,9 @@ bulk_rmadd_func *func;
  * Some keywords are defined to provide quick access
  * to common preferences.
  *
+ * Unless there is a special need, using "NORMAL" or "NORMAL:%COMPAT" for compatibility 
+ * is recommended.
+ *
  * "PERFORMANCE" means all the "secure" ciphersuites are enabled,
  * limited to 128 bit ciphers and sorted by terms of speed
  * performance.
@@ -781,6 +756,10 @@ bulk_rmadd_func *func;
  * "NORMAL" means all "secure" ciphersuites. The 256-bit ciphers are
  * included as a fallback only.  The ciphers are sorted by security
  * margin.
+ *
+ * "PFS" means all "secure" ciphersuites that support perfect forward secrecy. 
+ * The 256-bit ciphers are included as a fallback only.  
+ * The ciphers are sorted by security margin.
  *
  * "SECURE128" means all "secure" ciphersuites of security level 128-bit
  * or more.
@@ -1255,15 +1234,6 @@ int
 gnutls_set_default_export_priority (gnutls_session_t session)
 {
   return gnutls_priority_set_direct (session, "EXPORT", NULL);
-}
-
-/* Increases the priority of AES-GCM as it is much faster
- * than anything else if hardware support is there.
- */
-void _gnutls_priority_prefer_aes_gcm(void)
-{
-  cipher_priority_performance = cipher_priority_performance_hw_aes;
-  cipher_priority_normal = cipher_priority_normal_hw_aes;
 }
 
 /**

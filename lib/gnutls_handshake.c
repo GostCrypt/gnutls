@@ -121,9 +121,11 @@ _gnutls_handshake_hash_buffers_clear (gnutls_session_t session)
  * internals, and to security_parameters.
  * this will keep as less data to security_parameters.
  */
-static void
+static int
 resume_copy_required_values (gnutls_session_t session)
 {
+int ret;
+
   /* get the new random values */
   memcpy (session->internals.resumed_security_parameters.server_random,
           session->security_parameters.server_random, GNUTLS_RANDOM_SIZE);
@@ -138,12 +140,17 @@ resume_copy_required_values (gnutls_session_t session)
           session->internals.resumed_security_parameters.cipher_suite, 2);
   session->security_parameters.compression_method = session->internals.resumed_security_parameters.compression_method;
 
-  _gnutls_epoch_set_cipher_suite (session, EPOCH_NEXT,
+  ret = _gnutls_epoch_set_cipher_suite (session, EPOCH_NEXT,
                                   session->
                                   internals.resumed_security_parameters.cipher_suite);
-  _gnutls_epoch_set_compression (session, EPOCH_NEXT,
+  if (ret < 0)
+    return gnutls_assert_val(ret);
+
+  ret = _gnutls_epoch_set_compression (session, EPOCH_NEXT,
                                  session->
                                  internals.resumed_security_parameters.compression_method);
+  if (ret < 0)
+    return gnutls_assert_val(ret);
 
   /* or write_compression_algorithm
    * they are the same
@@ -152,10 +159,12 @@ resume_copy_required_values (gnutls_session_t session)
   session->security_parameters.entity =
     session->internals.resumed_security_parameters.entity;
 
-  if (session->internals.resumed_security_parameters.pversion != NULL)
-    _gnutls_set_current_version (session,
-                                 session->internals.resumed_security_parameters.
-                                 pversion->id);
+  if (session->internals.resumed_security_parameters.pversion == NULL)
+    return gnutls_assert_val(GNUTLS_E_INTERNAL_ERROR);
+    
+  _gnutls_set_current_version (session,
+                               session->internals.resumed_security_parameters.
+                               pversion->id);
 
   session->security_parameters.cert_type =
     session->internals.resumed_security_parameters.cert_type;
@@ -166,6 +175,7 @@ resume_copy_required_values (gnutls_session_t session)
   session->security_parameters.session_id_size =
     session->internals.resumed_security_parameters.session_id_size;
 
+  return 0;
 }
 
 
@@ -536,7 +546,10 @@ _gnutls_read_client_hello (gnutls_session_t session, uint8_t * data,
           return ret;
         }
 
-      resume_copy_required_values (session);
+      ret = resume_copy_required_values (session);
+      if (ret < 0)
+        return gnutls_assert_val(ret);
+
       session->internals.resumed = RESUME_TRUE;
 
       return _gnutls_user_hello_func (session, adv_version);
@@ -619,7 +632,9 @@ _gnutls_read_client_hello (gnutls_session_t session, uint8_t * data,
       session->internals.resumed_security_parameters.max_record_send_size =
         session->security_parameters.max_record_send_size;
 
-      resume_copy_required_values (session);
+      ret = resume_copy_required_values (session);
+      if (ret < 0)
+        return gnutls_assert_val(ret);
 
       return _gnutls_user_hello_func (session, adv_version);
     }
@@ -3168,17 +3183,17 @@ _gnutls_handshake_server (gnutls_session_t session)
         {
           ret = _gnutls_send_handshake_final (session, FALSE);
           IMED_RET ("send handshake final", ret, 1);
+
+          if (session->security_parameters.entity == GNUTLS_SERVER && session->internals.ticket_sent == 0)
+            {
+              /* if no ticket, save session data */
+              _gnutls_server_register_current_session (session);
+            }
         }
       else
         {
           ret = _gnutls_recv_handshake_final (session, FALSE);
           IMED_RET ("recv handshake final 2", ret, 1);
-        }
-
-      if (session->security_parameters.entity == GNUTLS_SERVER && session->internals.ticket_sent == 0)
-        {
-          /* if no ticket, save session data */
-          _gnutls_server_register_current_session (session);
         }
 
       STATE = STATE0;
@@ -3317,6 +3332,9 @@ check_server_params (gnutls_session_t session,
   else
     return 0;                   /* no need for params */
 
+  /* If the key exchange method needs DH params,
+   * but they are not set then remove it.
+   */
   if (_gnutls_kx_needs_dh_params (kx) != 0)
     {
       /* needs DH params. */

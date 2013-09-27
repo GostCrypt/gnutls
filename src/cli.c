@@ -46,8 +46,6 @@
 #include <gnutls/pkcs11.h>
 
 /* Gnulib portability files. */
-#include <progname.h>
-#include <version-etc.h>
 #include <read-file.h>
 #include <getpass.h>
 #include <minmax.h>
@@ -857,7 +855,6 @@ main (int argc, char **argv)
   struct sigaction new_action;
 #endif
 
-  set_program_name (argv[0]);
   cmd_parser (argc, argv);
 
   gnutls_global_set_log_function (tls_log_func);

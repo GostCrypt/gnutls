@@ -39,12 +39,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <error.h>
 
 /* Gnulib portability files. */
 #include <read-file.h>
-#include <progname.h>
-#include <version-etc.h>
 
 #include "p11tool-args.h"
 #include "p11tool.h"
@@ -65,7 +62,6 @@ tls_log_func (int level, const char *str)
 int
 main (int argc, char **argv)
 {
-  set_program_name (argv[0]);
   cmd_parser (argc, argv);
 
   return 0;
@@ -100,7 +96,10 @@ cmd_parser (int argc, char **argv)
     printf ("Setting log level to %d\n", debug);
 
   if ((ret = gnutls_global_init ()) < 0)
-    error (EXIT_FAILURE, 0, "global_init: %s", gnutls_strerror (ret));
+    {
+      fprintf (stderr, "global_init: %s", gnutls_strerror (ret));
+      exit(1);
+    }
 
   if (HAVE_OPT(PROVIDER))
     {
@@ -111,8 +110,11 @@ cmd_parser (int argc, char **argv)
         {
           ret = gnutls_pkcs11_add_provider (OPT_ARG(PROVIDER), NULL);
           if (ret < 0)
-            error (EXIT_FAILURE, 0, "pkcs11_add_provider: %s",
+            {
+              fprintf (stderr, "pkcs11_add_provider: %s",
                    gnutls_strerror (ret));
+              exit(1);
+            }
         }
     }
   else
@@ -126,7 +128,10 @@ cmd_parser (int argc, char **argv)
     {
       outfile = safe_open_rw (OPT_ARG(OUTFILE), 0);
       if (outfile == NULL)
-        error (EXIT_FAILURE, errno, "%s", OPT_ARG(OUTFILE));
+        {
+          fprintf (stderr, "%s", OPT_ARG(OUTFILE));
+          exit(1);
+        }
     }
   else
     outfile = stdout;

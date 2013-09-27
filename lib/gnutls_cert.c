@@ -139,6 +139,7 @@ gnutls_certificate_free_ca_names (gnutls_certificate_credentials_t sc)
   _gnutls_free_datum (&sc->x509_rdn_sequence);
 }
 
+
 /**
  * gnutls_certificate_free_credentials:
  * @sc: is a #gnutls_certificate_credentials_t structure.

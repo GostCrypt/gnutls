@@ -145,7 +145,7 @@ void _gnutls_selected_certs_deinit (gnutls_session_t session);
 void _gnutls_selected_certs_set (gnutls_session_t session,
                                  gnutls_pcert_st * certs, int ncerts,
                                  gnutls_privkey_t key, int need_free);
-
+ 
 int _gnutls_get_auth_info_pcert (gnutls_pcert_st* gcert,
                                  gnutls_certificate_type_t type,
                                  cert_auth_info_t info);

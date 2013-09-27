@@ -44,8 +44,6 @@
 #include <socket.h>
 
 /* Gnulib portability files. */
-#include "progname.h"
-#include "version-etc.h"
 #include "read-file.h"
 #include "minmax.h"
 #include "sockets.h"
@@ -948,7 +946,6 @@ main (int argc, char **argv)
   char name[256];
   int cert_set = 0;
 
-  set_program_name (argv[0]);
   cmd_parser (argc, argv);
 
 #ifndef _WIN32
@@ -1202,10 +1199,8 @@ main (int argc, char **argv)
 /*      gnutls_anon_set_server_dh_params(dh_cred, dh_params); */
 #endif
 
-#ifdef ENABLE_SESSION_TICKET
   if (noticket == 0)
     gnutls_session_ticket_key_generate (&session_ticket_key);
-#endif
 
   if (HAVE_OPT (MTU))
     mtu = OPT_VALUE_MTU;
@@ -1221,6 +1216,8 @@ main (int argc, char **argv)
     udp_server (name, port, mtu);
   else
     tcp_server (name, port);
+  
+  return 0;
 }
 
 static void
@@ -1613,10 +1610,8 @@ tcp_server (const char *name, int port)
   gnutls_anon_free_server_credentials (dh_cred);
 #endif
 
-#ifdef ENABLE_SESSION_TICKET
   if (noticket == 0)
     gnutls_free (session_ticket_key.data);
-#endif
 
   if (nodb == 0)
     wrap_db_deinit ();

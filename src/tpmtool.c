@@ -39,12 +39,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <error.h>
 
 /* Gnulib portability files. */
 #include <read-file.h>
-#include <progname.h>
-#include <version-etc.h>
 
 #include "certtool-common.h"
 #include "tpmtool-args.h"
@@ -72,7 +69,6 @@ tls_log_func (int level, const char *str)
 int
 main (int argc, char **argv)
 {
-  set_program_name (argv[0]);
   cmd_parser (argc, argv);
 
   return 0;
@@ -133,13 +129,19 @@ cmd_parser (int argc, char **argv)
     printf ("Setting log level to %d\n", debug);
 
   if ((ret = gnutls_global_init ()) < 0)
-    error (EXIT_FAILURE, 0, "global_init: %s", gnutls_strerror (ret));
+    {
+      fprintf (stderr, "global_init: %s", gnutls_strerror (ret));
+      exit(1);
+    }
 
   if (HAVE_OPT(OUTFILE))
     {
       outfile = safe_open_rw (OPT_ARG(OUTFILE), 0);
       if (outfile == NULL)
-        error (EXIT_FAILURE, errno, "%s", OPT_ARG(OUTFILE));
+        {
+          fprintf (stderr, "%s", OPT_ARG(OUTFILE));
+          exit(1);
+        }
     }
   else
     outfile = stdout;
@@ -148,7 +150,10 @@ cmd_parser (int argc, char **argv)
     {
       infile = fopen (OPT_ARG(INFILE), "rb");
       if (infile == NULL)
-        error (EXIT_FAILURE, errno, "%s", OPT_ARG(INFILE));
+        {
+          fprintf (stderr, "%s", OPT_ARG(INFILE));
+          exit(1);
+        }
     }
   else
     infile = stdin;
@@ -213,7 +218,10 @@ static void tpm_generate(FILE* outfile, unsigned int key_type, unsigned int bits
   free(srk_pass);
 
   if (ret < 0)
-    error (EXIT_FAILURE, 0, "gnutls_tpm_privkey_generate: %s", gnutls_strerror (ret));
+    {
+      fprintf (stderr, "gnutls_tpm_privkey_generate: %s", gnutls_strerror (ret));
+      exit(1);
+    }
 
 /*  fwrite (pubkey.data, 1, pubkey.size, outfile);
   fputs ("\n", outfile);*/
@@ -233,7 +241,10 @@ static void tpm_delete(const char* url, FILE* outfile)
   
   ret = gnutls_tpm_privkey_delete(url, srk_pass);
   if (ret < 0)
-    error (EXIT_FAILURE, 0, "gnutls_tpm_privkey_delete: %s", gnutls_strerror (ret));
+    {
+      fprintf (stderr, "gnutls_tpm_privkey_delete: %s", gnutls_strerror (ret));
+      exit(1);
+    }
 
   fprintf (outfile, "Key %s deleted\n", url);
 }
@@ -247,7 +258,10 @@ static void tpm_list(FILE* outfile)
   
   ret = gnutls_tpm_get_registered (&list);
   if (ret < 0)
-    error (EXIT_FAILURE, 0, "gnutls_tpm_get_registered: %s", gnutls_strerror (ret));
+    {
+      fprintf (stderr, "gnutls_tpm_get_registered: %s", gnutls_strerror (ret));
+      exit(1);
+    }
     
   fprintf(outfile, "Available keys:\n");
   for (i=0;;i++)
@@ -256,7 +270,10 @@ static void tpm_list(FILE* outfile)
       if (ret == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
         break;
       else if (ret < 0)
-        error (EXIT_FAILURE, 0, "gnutls_tpm_key_list_get_url: %s", gnutls_strerror (ret));
+        {
+          fprintf (stderr, "gnutls_tpm_key_list_get_url: %s", gnutls_strerror (ret));
+          exit(1);
+        }
   
       fprintf(outfile, "\t%u: %s\n", i, url);
       gnutls_free(url);
@@ -282,7 +299,10 @@ static void tpm_pubkey(const char* url, FILE* outfile)
   free(srk_pass);
 
   if (ret < 0)
-    error (EXIT_FAILURE, 0, "gnutls_pubkey_import_tpm_url: %s", gnutls_strerror (ret));
+    {
+      fprintf (stderr, "gnutls_pubkey_import_tpm_url: %s", gnutls_strerror (ret));
+      exit(1);
+    }
 
   _pubkey_info(outfile, GNUTLS_CRT_PRINT_FULL, pubkey);
 

@@ -878,6 +878,13 @@ Means all the known to be secure ciphersuites. The ciphers are sorted by securit
 margin, although the 256-bit ciphers are included as a fallback only.
 The message authenticity security level is of 64 bits or more.
 
+@item PFS @tab
+Means all the known to be secure ciphersuites that support perfect forward
+secrecy. The ciphers are sorted by security
+margin, although the 256-bit ciphers are included as a fallback only.
+The message authenticity security level is of 64 bits or more. This
+option is available since 3.2.4 or later.
+
 @item SECURE128 @tab
 Means all known to be secure ciphersuites that offer a 
 security level 128-bit or more and a message authenticity
@@ -1032,7 +1039,7 @@ will use the latest TLS version record version in client hello.
 will enable the new padding extension negotiation. If the new padding extension
 is negotiated, GnuTLS will use a more efficient length-hiding mechanism.
 Use @funcref{gnutls_record_can_use_length_hiding} to check whether length-hiding
-can be used in the current session.
+can be used in the current session. This is a GnuTLS extension to the protocol.
 
 @end multitable
 @caption{Special priority string keywords.}
@@ -1483,14 +1490,7 @@ another priority string is:
 NORMAL:-VERS-TLS-ALL:+VERS-TLS1.0:+VERS-SSL3.0:%COMPAT
 @end verbatim
 This priority string will in addition to above, only enable SSL 3.0 and 
-TLS 1.0 as protocols. Note however that
-there are known attacks against those protocol versions, especially over
-the CBC-mode ciphersuites. To mitigate them another priority string
-that only allows the stream cipher ARCFOUR is below.
-@verbatim
-NORMAL:-VERS-TLS-ALL:+VERS-TLS1.0:+VERS-SSL3.0:-CIPHER-ALL:+ARCFOUR-128:%COMPAT
-@end verbatim
-
+TLS 1.0 as protocols. 
 
 
 @node Compatibility with the OpenSSL library

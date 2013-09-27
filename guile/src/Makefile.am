@@ -1,5 +1,5 @@
 #  GnuTLS --- Guile bindings for GnuTLS.
-#  Copyright (C) 2007-2012 Free Software Foundation, Inc.
+#  Copyright (C) 2007-2013 Free Software Foundation, Inc.
 #
 #  GnuTLS is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU Lesser General Public
@@ -80,19 +80,24 @@ endif HAVE_GCC
 
 
 enums.h: $(srcdir)/make-enum-header.scm
-	$(GUILE_FOR_BUILD) $^ > $@
+	$(GUILE_FOR_BUILD) "$^" > "$@.tmp"
+	mv "$@.tmp" "$@"
 
 enum-map.i.c: $(srcdir)/make-enum-map.scm
-	$(GUILE_FOR_BUILD) $^ > $@
+	$(GUILE_FOR_BUILD) "$^" > "$@.tmp"
+	mv "$@.tmp" "$@"
 
 smobs.h: $(srcdir)/make-smob-header.scm
-	$(GUILE_FOR_BUILD) $^ > $@
+	$(GUILE_FOR_BUILD) "$^" > "$@.tmp"
+	mv "$@.tmp" "$@"
 
 smob-types.i.c: $(srcdir)/make-smob-types.scm
-	$(GUILE_FOR_BUILD) $^ > $@
+	$(GUILE_FOR_BUILD) "$^" > "$@.tmp"
+	mv "$@.tmp" "$@"
 
 priorities.i.c: $(srcdir)/make-session-priorities.scm
-	$(GUILE_FOR_BUILD) $^ > $@
+	$(GUILE_FOR_BUILD) "$^" > "$@.tmp"
+	mv "$@.tmp" "$@"
 
 
 # C file snarfing.
@@ -102,7 +107,10 @@ priorities.i.c: $(srcdir)/make-session-priorities.scm
 snarfcppopts = $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
 	       $(CFLAGS) $(guile_gnutls_v_2_la_CFLAGS)
 
-.c.x: $(GENERATED_BINDINGS)
+# Note: we cannot use the portable ".c.x" form, since that leads
+# prerequisites to be ignored:
+# <http://lists.gnutls.org/pipermail/gnutls-devel/2013-September/006453.html>.
+%.x: %.c $(GENERATED_BINDINGS)
 	$(guile_snarf) -o $@ $< $(snarfcppopts)
 
 # Target used by doc/Makefile, to create all built sources necessary

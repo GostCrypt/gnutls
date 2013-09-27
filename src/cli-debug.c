@@ -38,8 +38,6 @@
 #include <socket.h>
 
 /* Gnulib portability files. */
-#include <progname.h>
-#include <version-etc.h>
 #include "sockets.h"
 
 static void cmd_parser (int argc, char **argv);
@@ -178,7 +176,6 @@ main (int argc, char **argv)
   char portname[6];
   struct addrinfo hints, *res, *ptr;
 
-  set_program_name (argv[0]);
   cmd_parser(argc, argv);
 
 #ifndef _WIN32

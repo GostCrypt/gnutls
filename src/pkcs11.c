@@ -75,9 +75,8 @@ pkcs11_list (FILE * outfile, const char *url, int type, unsigned int login,
              unsigned int detailed, common_info_st * info)
 {
   gnutls_pkcs11_obj_t *crt_list;
-  gnutls_x509_crt_t xcrt;
   unsigned int crt_list_size = 0, i;
-  int ret;
+  int ret, otype;
   char *output;
   int attrs;
   unsigned int obj_flags = 0;
@@ -143,9 +142,9 @@ pkcs11_list (FILE * outfile, const char *url, int type, unsigned int login,
 
       fprintf (outfile, "Object %d:\n\tURL: %s\n", i, output);
 
+      otype = gnutls_pkcs11_obj_get_type(crt_list[i]);
       fprintf (outfile, "\tType: %s\n",
-               gnutls_pkcs11_type_get_name (gnutls_pkcs11_obj_get_type
-                                            (crt_list[i])));
+               gnutls_pkcs11_type_get_name (otype));
 
       size = sizeof (buf);
       ret =
@@ -170,46 +169,6 @@ pkcs11_list (FILE * outfile, const char *url, int type, unsigned int login,
           exit (1);
         }
       fprintf (outfile, "\tID: %s\n\n", buf);
-
-
-
-      if (attrs == GNUTLS_PKCS11_OBJ_ATTR_ALL
-          || attrs == GNUTLS_PKCS11_OBJ_ATTR_PRIVKEY)
-        continue;
-
-      ret = gnutls_x509_crt_init (&xcrt);
-      if (ret < 0)
-        {
-          fprintf (stderr, "Error in %s:%d: %s\n", __func__, __LINE__,
-                   gnutls_strerror (ret));
-          exit (1);
-        }
-
-      ret = gnutls_x509_crt_import_pkcs11 (xcrt, crt_list[i]);
-      if (ret < 0)
-        {
-          fprintf (stderr, "Error in %s:%d: %s\n", __func__, __LINE__,
-                   gnutls_strerror (ret));
-          exit (1);
-        }
-
-#if 0
-      size = buffer_size;
-      ret = gnutls_x509_crt_export (xcrt, GNUTLS_X509_FMT_PEM, buffer, &size);
-      if (ret < 0)
-        {
-          fprintf (stderr, "Error in %s:%d: %s\n", __func__, __LINE__,
-                   gnutls_strerror (ret));
-          exit (1);
-        }
-
-      fwrite (buffer, 1, size, outfile);
-      fputs ("\n\n", outfile);
-#endif
-
-      gnutls_x509_crt_deinit (xcrt);
-
-
     }
 
   return;

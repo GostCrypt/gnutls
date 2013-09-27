@@ -39,8 +39,6 @@
 /* Gnulib portability files. */
 #include <getpass.h>
 #include <minmax.h>
-#include <progname.h>
-#include <version-etc.h>
 
 #include <srptool-args.h>
 
@@ -425,8 +423,6 @@ int main (int argc, char **argv)
 #ifndef _WIN32
    struct passwd *pwd;
 #endif
-
-  set_program_name (argv[0]);
 
   if ((ret = gnutls_global_init ()) < 0)
     {

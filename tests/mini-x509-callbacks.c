@@ -33,6 +33,8 @@
 #include "eagain-common.h"
 
 /* Tests whether the verify callbacks are operational.
+ * In addition gnutls_handshake_get_last_in() and gnutls_handshake_get_last_out() 
+ * are tested.
  */
 
 const char* side;
@@ -68,6 +70,7 @@ unsigned int msg_order[] = {
 static int handshake_callback (gnutls_session_t session, unsigned int htype, unsigned post, unsigned int incoming)
 {
 static unsigned idx = 0;
+unsigned int msg;
 
       if (msg_order[idx] != htype)
         {
@@ -75,6 +78,25 @@ static unsigned idx = 0;
           exit(1);
         }
       idx++;
+      
+      if (incoming != 0)
+        {
+          msg = gnutls_handshake_get_last_in(session);
+          if (msg != htype)
+            {
+              fail("last input message was not recorded (exp: %d, found: %d) \n", msg, htype);
+              exit(1);
+            }
+        }
+      else
+        {
+          msg = gnutls_handshake_get_last_out(session);
+          if (msg != htype)
+            {
+              fail("last output message was not recorded (exp: %d, found: %d) \n", msg, htype);
+              exit(1);
+            }
+        }
 
   return 0;
 }
@@ -83,6 +105,19 @@ static int
 server_callback (gnutls_session_t session)
 {
   server_ok = 1;
+
+  if (gnutls_handshake_get_last_in(session) != GNUTLS_HANDSHAKE_CERTIFICATE_PKT) 
+    {
+      fail("client's last input message was unexpected\n");
+      exit(1);
+    }
+
+  if (gnutls_handshake_get_last_out(session) != GNUTLS_HANDSHAKE_SERVER_HELLO_DONE)
+    {
+      fail("client's last output message was unexpected\n");
+      exit(1);
+    }
+
   return 0;
 }
 
@@ -160,7 +195,7 @@ void doit(void)
   gnutls_priority_set_direct (server, "NORMAL", NULL);
   gnutls_transport_set_push_function (server, server_push);
   gnutls_transport_set_pull_function (server, server_pull);
-  gnutls_transport_set_ptr (server, (gnutls_transport_ptr_t)server);
+  gnutls_transport_set_ptr (server, server);
   gnutls_certificate_set_verify_function (serverx509cred, server_callback);
   gnutls_certificate_server_set_request (server, GNUTLS_CERT_REQUEST);
   gnutls_handshake_set_post_client_hello_function (server, post_client_hello_callback);
@@ -173,7 +208,7 @@ void doit(void)
   gnutls_priority_set_direct (client, "NORMAL", NULL);
   gnutls_transport_set_push_function (client, client_push);
   gnutls_transport_set_pull_function (client, client_pull);
-  gnutls_transport_set_ptr (client, (gnutls_transport_ptr_t)client);
+  gnutls_transport_set_ptr (client, client);
   gnutls_certificate_set_verify_function (clientx509cred, client_callback);
 
   HANDSHAKE(client, server);
