@@ -1,31 +1,61 @@
 os:
- - osx
+ - linux
 
 language: c
 compiler:
-  - clang
-
-git:
-  submodules: false
+  - gcc
+dist: trusty
+sudo: false
 
 notifications:
   email:
     on_success: change
     on_failure: always
 
+addons:
+  apt:
+    packages:
+      - autogen
+      - autopoint
+      - datefudge
+      - dieharder
+      - gettext
+      - gperf
+      - libgmp-dev
+      - libidn2-0-dev
+      - libtspi-dev
+      - libunbound-dev
+      - libunistring-dev
+      - ppp
+      - python-six
+      - socat
+      - unbound-anchor
+      - valgrind
 
-before_install:
-  - git submodule update --init
-  - if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then
-        brew install autoconf automake autogen libtool nettle valgrind p11-kit libtasn1 gettext || true;
-    fi
+env:
+  - GOSTNETTLE=yes ENGOST=yes
+  - GOSTNETTLE=no ENGOST=yes
+  - GOSTNETTLE=no ENGOST=no
+matrix:
+  allow_failures:
+    - env: GOSTNETTLE=no ENGOST=yes
 
+before_script:
+  - NCPU=$(nproc)
+  - if [ "$GOSTNETTLE" = "no" ] ; then wget https://ftp.gnu.org/gnu/nettle/nettle-3.3.tar.gz && tar xzf nettle-3.3.tar.gz && cd nettle-3.3 ; else git clone -b gost https://github.com/GostCrypt/nettle.git nettle && cd nettle && autoreconf -vis ; fi
+  - ./configure --prefix=$HOME
+  - make -j$NCPU
+  - make install -j$NCPU
+  - export LD_LIBRARY_PATH="$HOME/lib:$LD_LIBRARY_PATH"
+  - export PKG_CONFIG_PATH="$HOME/lib/pkgconfig"
+  - ls -l $HOME/lib
+  - cd ..
+  - /usr/sbin/unbound-anchor -v -F -a $HOME/root.key || true
 script:
-  - PATH=/usr/local/opt/gettext/bin:$PATH make autoreconf
-  - PATH=/usr/local/opt/gettext/bin:$PATH ./configure --disable-full-test-suite --disable-valgrind-tests --disable-doc --disable-guile --disable-dependency-tracking
-  - make -j$(sysctl -n hw.ncpu)
-  - make -j$(sysctl -n hw.ncpu) check gl_public_submodule_commit=
-
+  - make bootstrap
+  - ls m4/
+  - ./configure --prefix="$HOME" --enable-gost="$ENGOST" --disable-doc --with-included-libtasn1 --without-p11-kit --with-unbound-root-key-file="$HOME/root.key" LDFLAGS="-Wl,--disable-new-dtags" --enable-valgrind-tests
+  - make -j$NCPU
+  - make -j$NCPU check
 after_failure:
-  - for i in tests/*.log fuzz/*.log;do echo "" && echo $i && cat $i;done
-
+  - find . -name 'test-suite.log' -execdir grep -il "FAILED" {} \; -exec echo {} \; -exec cat {} \;
