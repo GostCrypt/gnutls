@@ -92,6 +92,23 @@ AC_MSG_ERROR([[
       mini_nettle=$withval,
       mini_nettle=no)
 
+  AC_CACHE_CHECK([for GOST functions in nettle/hogweed], [ac_cv_nettle_gost],
+    [save_CFLAGS=$CFLAGS
+    save_LIBS=$LIBS
+    CFLAGS="$CFLAGS $HOGWEED_CFLAGS"
+    LIBS="$LIBS $HOGWEED_LIBS"
+    AC_LINK_IFELSE(
+      [AC_LANG_PROGRAM([#include <nettle/gostdsa.h>],
+        [return gostdsa_verify(NULL, 0, NULL, NULL);])],
+      [AS_VAR_SET([ac_cv_nettle_gost], [yes])],
+      [AS_VAR_SET([ac_cv_nettle_gost], [no])])
+    CFLAGS=$save_CFLAGS
+    LIBS=$save_LIBS])
+  AS_VAR_IF([ac_cv_nettle_gost], [yes],
+    [AC_DEFINE([HAVE_NETTLE_GOST], [1],
+      [Define to 1 if Nettle provides GOST cryptography support])])
+  AM_CONDITIONAL([HAVE_NETTLE_GOST], [test "$ac_cv_nettle_gost" = "yes"])
+
   AC_ARG_VAR(GMP_CFLAGS, [C compiler flags for gmp])
   AC_ARG_VAR(GMP_LIBS, [linker flags for gmp])
   if test "$mini_nettle" != no;then
