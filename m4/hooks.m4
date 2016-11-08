@@ -92,6 +92,22 @@ AC_MSG_ERROR([[
       mini_nettle=$withval,
       mini_nettle=no)
 
+  AC_CACHE_CHECK([for CFB support in nettle], [ac_cv_nettle_cfb],
+    [save_CFLAGS=$CFLAGS
+    save_LIBS=$LIBS
+    CFLAGS="$CFLAGS $NETTLE_CFLAGS"
+    LIBS="$LIBS $NETTLE_LIBS"
+    AC_LINK_IFELSE(
+      [AC_LANG_PROGRAM([#include <nettle/cfb.h>],
+        [cfb_encrypt(NULL, NULL, 0, NULL, 0, NULL, NULL); return 0;])],
+      [AS_VAR_SET([ac_cv_nettle_cfb], [yes])],
+      [AS_VAR_SET([ac_cv_nettle_cfb], [no])])
+    CFLAGS=$save_CFLAGS
+    LIBS=$save_LIBS])
+  AS_VAR_IF([ac_cv_nettle_cfb], [yes],
+    [AC_DEFINE([HAVE_NETTLE_CFB], [1],
+      [Define to 1 if Nettle provides CFB mode support])])
+
   AC_CACHE_CHECK([for GOST functions in nettle/hogweed], [ac_cv_nettle_gost],
     [save_CFLAGS=$CFLAGS
     save_LIBS=$LIBS

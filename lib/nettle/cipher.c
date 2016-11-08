@@ -35,6 +35,9 @@
 #include <nettle/des.h>
 #include <nettle/nettle-meta.h>
 #include <nettle/cbc.h>
+#if HAVE_NETTLE_CFB
+#include <nettle/cfb.h>
+#endif
 #include <nettle/gcm.h>
 #include <nettle/ccm.h>
 #include <nettle/chacha-poly1305.h>
@@ -130,6 +133,26 @@ _cbc_decrypt(struct nettle_cipher_ctx *ctx, size_t length, uint8_t * dst,
 		    ctx->iv_size, ctx->iv,
 		    length, dst, src);
 }
+
+#if HAVE_NETTLE_CFB
+static void
+_cfb_encrypt(struct nettle_cipher_ctx *ctx, size_t length, uint8_t * dst,
+		const uint8_t * src)
+{
+	cfb_encrypt(ctx->ctx_ptr, ctx->cipher->encrypt_block,
+		    ctx->iv_size, ctx->iv,
+		    length, dst, src);
+}
+
+static void
+_cfb_decrypt(struct nettle_cipher_ctx *ctx, size_t length, uint8_t * dst,
+		const uint8_t * src)
+{
+	cfb_decrypt(ctx->ctx_ptr, ctx->cipher->encrypt_block,
+		    ctx->iv_size, ctx->iv,
+		    length, dst, src);
+}
+#endif
 
 static void
 _ccm_encrypt(struct nettle_cipher_ctx *ctx,
