@@ -33,11 +33,20 @@
 #include <nettle/arctwo.h>
 #include <nettle/salsa20.h>
 #include <nettle/des.h>
-#include <nettle/nettle-meta.h>
-#include <nettle/cbc.h>
+#if ENABLE_GOST
+#if HAVE_NETTLE_GOST
+#include <nettle/gost28147.h>
+#else
+#include "gost/gost28147.h"
+#endif
 #if HAVE_NETTLE_CFB
 #include <nettle/cfb.h>
+#else
+#include "gost/cfb.h"
 #endif
+#endif
+#include <nettle/nettle-meta.h>
+#include <nettle/cbc.h>
 #include <nettle/gcm.h>
 #include <nettle/ccm.h>
 #include <nettle/chacha-poly1305.h>
@@ -134,7 +143,7 @@ _cbc_decrypt(struct nettle_cipher_ctx *ctx, size_t length, uint8_t * dst,
 		    length, dst, src);
 }
 
-#if HAVE_NETTLE_CFB
+#if ENABLE_GOST
 static void
 _cfb_encrypt(struct nettle_cipher_ctx *ctx, size_t length, uint8_t * dst,
 		const uint8_t * src)
@@ -151,6 +160,79 @@ _cfb_decrypt(struct nettle_cipher_ctx *ctx, size_t length, uint8_t * dst,
 	cfb_decrypt(ctx->ctx_ptr, ctx->cipher->encrypt_block,
 		    ctx->iv_size, ctx->iv,
 		    length, dst, src);
+}
+
+static void
+_gost28147_set_key_tc26z(void *ctx, const uint8_t *key)
+{
+	gost28147_set_key(ctx, key);
+	gost28147_set_param(ctx, &gost28147_param_TC26_Z);
+}
+
+static void
+_gost28147_cnt_set_key_tc26z(void *ctx, const uint8_t *key)
+{
+	gost28147_cnt_init(ctx, key, &gost28147_param_TC26_Z);
+}
+
+static void
+_gost28147_set_key_cpa(void *ctx, const uint8_t *key)
+{
+	gost28147_set_key(ctx, key);
+	gost28147_set_param(ctx, &gost28147_param_CryptoPro_A);
+}
+
+static void
+_gost28147_cnt_set_key_cpa(void *ctx, const uint8_t *key)
+{
+	gost28147_cnt_init(ctx, key, &gost28147_param_CryptoPro_A);
+}
+
+static void
+_gost28147_set_key_cpb(void *ctx, const uint8_t *key)
+{
+	gost28147_set_key(ctx, key);
+	gost28147_set_param(ctx, &gost28147_param_CryptoPro_A);
+}
+
+static void
+_gost28147_cnt_set_key_cpb(void *ctx, const uint8_t *key)
+{
+	gost28147_cnt_init(ctx, key, &gost28147_param_CryptoPro_A);
+}
+
+static void
+_gost28147_set_key_cpc(void *ctx, const uint8_t *key)
+{
+	gost28147_set_key(ctx, key);
+	gost28147_set_param(ctx, &gost28147_param_CryptoPro_A);
+}
+
+static void
+_gost28147_cnt_set_key_cpc(void *ctx, const uint8_t *key)
+{
+	gost28147_cnt_init(ctx, key, &gost28147_param_CryptoPro_A);
+}
+
+static void
+_gost28147_set_key_cpd(void *ctx, const uint8_t *key)
+{
+	gost28147_set_key(ctx, key);
+	gost28147_set_param(ctx, &gost28147_param_CryptoPro_A);
+}
+
+static void
+_gost28147_cnt_set_key_cpd(void *ctx, const uint8_t *key)
+{
+	gost28147_cnt_init(ctx, key, &gost28147_param_CryptoPro_A);
+}
+
+static void
+_gost28147_cnt_crypt(struct nettle_cipher_ctx *ctx, size_t length, uint8_t * dst,
+		     const uint8_t * src)
+{
+	gost28147_cnt_crypt((void *)ctx->ctx_ptr, ctx->iv,
+			    length, dst, src);
 }
 #endif
 
@@ -513,6 +595,138 @@ static const struct nettle_cipher_st builtin_ciphers[] = {
 	   .set_iv = (setiv_func)_chacha_poly1305_set_nonce,
 	   .max_iv_size = CHACHA_POLY1305_NONCE_SIZE,
 	},
+#if ENABLE_GOST
+	{
+	   .algo = GNUTLS_CIPHER_GOST28147_TC26Z_CFB,
+	   .block_size = GOST28147_BLOCK_SIZE,
+	   .key_size = GOST28147_KEY_SIZE,
+	   .encrypt_block = (nettle_cipher_func*)gost28147_encrypt_for_cfb,
+	   .decrypt_block = (nettle_cipher_func*)gost28147_encrypt_for_cfb,
+
+	   .ctx_size = sizeof(struct CFB_CTX(struct gost28147_ctx, GOST28147_BLOCK_SIZE)),
+	   .encrypt = _cfb_encrypt,
+	   .decrypt = _cfb_decrypt,
+	   .set_encrypt_key = _gost28147_set_key_tc26z,
+	   .set_decrypt_key = _gost28147_set_key_tc26z,
+	},
+	{
+	   .algo = GNUTLS_CIPHER_GOST28147_TC26Z_CNT,
+	   .block_size = GOST28147_BLOCK_SIZE,
+	   .key_size = GOST28147_KEY_SIZE,
+	   .encrypt_block = (nettle_cipher_func*)gost28147_encrypt, /* unused */
+	   .decrypt_block = (nettle_cipher_func*)gost28147_decrypt, /* unused */
+
+	   .ctx_size = sizeof(struct gost28147_cnt_ctx),
+	   .encrypt = _gost28147_cnt_crypt,
+	   .decrypt = _gost28147_cnt_crypt,
+	   .set_encrypt_key = _gost28147_cnt_set_key_tc26z,
+	   .set_decrypt_key = _gost28147_cnt_set_key_tc26z,
+	},
+	{
+	   .algo = GNUTLS_CIPHER_GOST28147_CPA_CFB,
+	   .block_size = GOST28147_BLOCK_SIZE,
+	   .key_size = GOST28147_KEY_SIZE,
+	   .encrypt_block = (nettle_cipher_func*)gost28147_encrypt_for_cfb,
+	   .decrypt_block = (nettle_cipher_func*)gost28147_encrypt_for_cfb,
+
+	   .ctx_size = sizeof(struct CFB_CTX(struct gost28147_ctx, GOST28147_BLOCK_SIZE)),
+	   .encrypt = _cfb_encrypt,
+	   .decrypt = _cfb_decrypt,
+	   .set_encrypt_key = _gost28147_set_key_cpa,
+	   .set_decrypt_key = _gost28147_set_key_cpa,
+	},
+	{
+	   .algo = GNUTLS_CIPHER_GOST28147_CPA_CNT,
+	   .block_size = GOST28147_BLOCK_SIZE,
+	   .key_size = GOST28147_KEY_SIZE,
+	   .encrypt_block = (nettle_cipher_func*)gost28147_encrypt, /* unused */
+	   .decrypt_block = (nettle_cipher_func*)gost28147_decrypt, /* unused */
+
+	   .ctx_size = sizeof(struct gost28147_cnt_ctx),
+	   .encrypt = _gost28147_cnt_crypt,
+	   .decrypt = _gost28147_cnt_crypt,
+	   .set_encrypt_key = _gost28147_cnt_set_key_cpa,
+	   .set_decrypt_key = _gost28147_cnt_set_key_cpa,
+	},
+	{
+	   .algo = GNUTLS_CIPHER_GOST28147_CPB_CFB,
+	   .block_size = GOST28147_BLOCK_SIZE,
+	   .key_size = GOST28147_KEY_SIZE,
+	   .encrypt_block = (nettle_cipher_func*)gost28147_encrypt_for_cfb,
+	   .decrypt_block = (nettle_cipher_func*)gost28147_encrypt_for_cfb,
+
+	   .ctx_size = sizeof(struct CFB_CTX(struct gost28147_ctx, GOST28147_BLOCK_SIZE)),
+	   .encrypt = _cfb_encrypt,
+	   .decrypt = _cfb_decrypt,
+	   .set_encrypt_key = _gost28147_set_key_cpb,
+	   .set_decrypt_key = _gost28147_set_key_cpb,
+	},
+	{
+	   .algo = GNUTLS_CIPHER_GOST28147_CPB_CNT,
+	   .block_size = GOST28147_BLOCK_SIZE,
+	   .key_size = GOST28147_KEY_SIZE,
+	   .encrypt_block = (nettle_cipher_func*)gost28147_encrypt, /* unused */
+	   .decrypt_block = (nettle_cipher_func*)gost28147_decrypt, /* unused */
+
+	   .ctx_size = sizeof(struct gost28147_cnt_ctx),
+	   .encrypt = _gost28147_cnt_crypt,
+	   .decrypt = _gost28147_cnt_crypt,
+	   .set_encrypt_key = _gost28147_cnt_set_key_cpb,
+	   .set_decrypt_key = _gost28147_cnt_set_key_cpb,
+	},
+	{
+	   .algo = GNUTLS_CIPHER_GOST28147_CPC_CFB,
+	   .block_size = GOST28147_BLOCK_SIZE,
+	   .key_size = GOST28147_KEY_SIZE,
+	   .encrypt_block = (nettle_cipher_func*)gost28147_encrypt_for_cfb,
+	   .decrypt_block = (nettle_cipher_func*)gost28147_encrypt_for_cfb,
+
+	   .ctx_size = sizeof(struct CFB_CTX(struct gost28147_ctx, GOST28147_BLOCK_SIZE)),
+	   .encrypt = _cfb_encrypt,
+	   .decrypt = _cfb_decrypt,
+	   .set_encrypt_key = _gost28147_set_key_cpc,
+	   .set_decrypt_key = _gost28147_set_key_cpc,
+	},
+	{
+	   .algo = GNUTLS_CIPHER_GOST28147_CPC_CNT,
+	   .block_size = GOST28147_BLOCK_SIZE,
+	   .key_size = GOST28147_KEY_SIZE,
+	   .encrypt_block = (nettle_cipher_func*)gost28147_encrypt, /* unused */
+	   .decrypt_block = (nettle_cipher_func*)gost28147_decrypt, /* unused */
+
+	   .ctx_size = sizeof(struct gost28147_cnt_ctx),
+	   .encrypt = _gost28147_cnt_crypt,
+	   .decrypt = _gost28147_cnt_crypt,
+	   .set_encrypt_key = _gost28147_cnt_set_key_cpc,
+	   .set_decrypt_key = _gost28147_cnt_set_key_cpc,
+	},
+	{
+	   .algo = GNUTLS_CIPHER_GOST28147_CPD_CFB,
+	   .block_size = GOST28147_BLOCK_SIZE,
+	   .key_size = GOST28147_KEY_SIZE,
+	   .encrypt_block = (nettle_cipher_func*)gost28147_encrypt_for_cfb,
+	   .decrypt_block = (nettle_cipher_func*)gost28147_encrypt_for_cfb,
+
+	   .ctx_size = sizeof(struct CFB_CTX(struct gost28147_ctx, GOST28147_BLOCK_SIZE)),
+	   .encrypt = _cfb_encrypt,
+	   .decrypt = _cfb_decrypt,
+	   .set_encrypt_key = _gost28147_set_key_cpd,
+	   .set_decrypt_key = _gost28147_set_key_cpd,
+	},
+	{
+	   .algo = GNUTLS_CIPHER_GOST28147_CPD_CNT,
+	   .block_size = GOST28147_BLOCK_SIZE,
+	   .key_size = GOST28147_KEY_SIZE,
+	   .encrypt_block = (nettle_cipher_func*)gost28147_encrypt, /* unused */
+	   .decrypt_block = (nettle_cipher_func*)gost28147_decrypt, /* unused */
+
+	   .ctx_size = sizeof(struct gost28147_cnt_ctx),
+	   .encrypt = _gost28147_cnt_crypt,
+	   .decrypt = _gost28147_cnt_crypt,
+	   .set_encrypt_key = _gost28147_cnt_set_key_cpd,
+	   .set_decrypt_key = _gost28147_cnt_set_key_cpd,
+	},
+#endif
 };
 
 static int wrap_nettle_cipher_exists(gnutls_cipher_algorithm_t algo)
