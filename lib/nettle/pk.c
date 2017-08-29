@@ -727,6 +727,7 @@ _wrap_nettle_pk_sign(gnutls_pk_algorithm_t algo,
 
 			mpz_init(s);
 
+			memset(vdata->data, 0, vdata->size);
 			ret =
 			    rsa_pkcs1_sign_tr(&pub, &priv, NULL, rnd_nonce_func,
 					      vdata->size, vdata->data, s);
