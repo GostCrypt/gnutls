@@ -5,6 +5,10 @@ language: c
 compiler:
   - clang
 
+env:
+  - EXTRADEPS="openssl"
+  - EXTRADEPS=""
+
 git:
   submodules: false
 
@@ -17,7 +21,7 @@ notifications:
 before_install:
   - if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then
         brew update;
-        for pkg in openssl autoconf automake autogen libtool nettle p11-kit libtasn1 gettext bison;do
+        for pkg in $EXTRADEPS autoconf automake autogen libtool nettle p11-kit libtasn1 gettext bison;do
           brew install $pkg || true;
         done;
         for pkg in nettle wget p11-kit libtasn1;do
